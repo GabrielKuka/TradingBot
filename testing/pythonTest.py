@@ -23,15 +23,6 @@ df = pd.read_csv("data/ohlc/{}.csv".format(symbol))
 # Set the index
 df = df.set_index(pd.DatetimeIndex(df['Date'].values))
 
-# Visualize data
-#plt.figure(figsize=(12.2, 4.5))
-#plt.plot(df['Close'], label="Close Price")
-#plt.title("{} Close Price".format(symbol))
-#plt.xlabel("Date")
-#plt.ylabel("Close Price USD ($)")
-#plt.legend(df.columns.values, loc='upper left')
-#plt.show()
-
 # Calculate the typical price
 typical_price = (df['Close'] + df['High'] + df['Low']) / 3
 
@@ -109,9 +100,6 @@ def get_signal(data, high, low):
 
 new_df['Buy'] = get_signal(new_df, 80, 20)[0]
 new_df['Sell'] = get_signal(new_df, 80, 20)[1]
-
-
-# Show data
 
 # Plot the data
 plt.figure(figsize=(12.2, 4.5))

@@ -2,7 +2,9 @@ import json, websocket
 import algorithms.momentum.rsi.rsi_algo as rsi
 from minute_bar import MinuteBar
 from algorithms.momentum.dual_avg_crossover.dual_avg_crossover import DualAverageCrossover
+from algorithms.momentum.mfi import mfi
 from config import *
+from helper.ValidateString import ValidateString
 
 
 authenticated = False
@@ -10,9 +12,8 @@ authenticated = False
 ws = None
 closes = []
 in_position = False
-algorithms = {1:'RSI', 2:'Dual Average CrossOver'}
 
-def begin( ):
+def begin():
     global ws
     handle_command()
 
@@ -31,24 +32,32 @@ def stream_minute_bars(symbol):
 
 
 def handle_command():
-    global algorithms, ws
+    global ws
 
-    for key in algorithms:
-        print("{0}. {1}".format((key), algorithms[key]))
+    while True:
 
-    algo = int(input("Choose one of the algorithms => "))
+        for key in ALGORITHMS:
+            print("{0}. {1}".format((key), ALGORITHMS[key]))
 
-    if algo == 1:
-        # RSI
-        print("[Trying to connect...]")
-        ws = websocket.WebSocketApp(socket, on_open=on_open,
-                                    on_message=on_message, on_close=on_close)
-        ws.run_forever()
-        ws.close()
+        algo = int(input("Choose one of the algorithms => "))
 
-    elif algo == 2:
-        dac = DualAverageCrossover()
-        dac.execute()
+        if algo == 0:
+            print("[EXITING]")
+            exit()
+        if algo == 1:
+            # RSI
+            print("[Trying to connect...]")
+            ws = websocket.WebSocketApp(SOCKET_URL, on_open=on_open,
+                                        on_message=on_message, on_close=on_close)
+            ws.run_forever()
+
+        elif algo == 2:
+            dac = DualAverageCrossover()
+            dac.execute()
+
+        elif algo == 3:
+            algo = mfi.MoneyFlowIndex()
+            algo.execute()
 
 
 def on_open(ws):
@@ -58,8 +67,20 @@ def on_open(ws):
     # Authenticate user
     authenticate()
 
+    # Ask the user to enter an asset
+
+    while True:
+        asset = input("Enter an asset: ")
+
+        if not ValidateString.is_asset_valid(asset):
+            print("\n[Asset Not Valid]\n")
+            print("1. Asset must be in capital.")
+            print("2. Asset must be at most 4 characters.")
+        else:
+            break
+
     # Stream something
-    #stream_minute_bars(asset)
+    stream_minute_bars(asset)
 
 
 def on_message(ws, message):
@@ -68,13 +89,13 @@ def on_message(ws, message):
     if not authenticated:
         check_auth(json.loads(message))
 
-#    bar_data = json.loads(message)["data"]
-#    mBar = MinuteBar(bar_data['T'], bar_data['c'])
-#
-#    closes.append(float(mBar.closing_price))
-#    print(mBar)
-#
-#    rsi.calc_rsi(closes, in_position)
+    bar_data = json.loads(message)["data"]
+    mBar = MinuteBar(bar_data['T'], bar_data['c'])
+
+    closes.append(float(mBar.closing_price))
+    print(mBar)
+
+    rsi.calc_rsi(closes, in_position)
 
 
 def on_close(ws):

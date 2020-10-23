@@ -25,7 +25,7 @@ class CSVReadWrite:
                 line = ""
                 for arg in args:
                     if arg == args[0]:
-                        line = str(row[arg])
+                        line = str(row[arg]) # Insert header here
                     else:
                         line = line + ","  +  str(row[arg])
 

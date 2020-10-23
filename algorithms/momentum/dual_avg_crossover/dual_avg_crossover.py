@@ -1,4 +1,5 @@
 # This algorithms uses the dual average crossover to determine when to buy and
+
 # when to sell.
 
 from helper.CSVReadWrite import CSVReadWrite
@@ -7,33 +8,32 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
+from interfaces.IMomentumAlgo import IMomentumAlgo
+from helper.ValidateString import ValidateString
 
 
-class DualAverageCrossover:
+class DualAverageCrossover(IMomentumAlgo):
 
     def __init__(self):
+
+        self.error = False
 
         self.display_header()
 
         self.symbol, self.days = self.input_data()
 
-        if self.symbol is None or self.days is None:
-           return
-
-        try:
-            # Retrieve bars from API
-            print("[Requesting Data]")
-            bars_dict = bars.get_historical_data(self.symbol, self.days, 'day')[self.symbol]
-        except:
-            print("[Error Retrieving Data]: Are you connected?")
-        else:
-
+        # Retrieve bars from API
+        print("[Requesting Data]")
+        bars_dict = bars.get_historical_data(self.symbol, self.days, 'day')
+        if bars_dict != False:
             # Save the data into a file
             csvfile = CSVReadWrite("data/ohlc/{}.csv".format(self.symbol), "Date,Open,High,Low,Close")
             csvfile.write_file(bars_dict, 't', 'o', 'h', 'l', 'c')
 
             # Read the file
             self.bars_df = pd.read_csv("data/ohlc/{}.csv".format(self.symbol))
+        else:
+            self.error = True
 
 
     def input_data(self):
@@ -42,7 +42,7 @@ class DualAverageCrossover:
         while True:
             asset = input("Enter asset => ")
 
-            if not self.is_asset_valid(asset):
+            if not ValidateString.is_asset_valid(asset):
                 print("\n[Asset Not Valid]\n")
                 print("1. Asset must be in capital.")
                 print("2. Asset must be at most 4 characters.")
@@ -51,24 +51,13 @@ class DualAverageCrossover:
 
         while True:
             days = input("Days in the past to retrieve data [30 - 1000] => ")
-            if not self.are_days_valid(days):
+            if not ValidateString.are_days_valid(days):
                 print("\n[Value Not Valid]\n")
                 print("1. Days must be from 30 - 1000.")
             else:
                 break
 
         return asset, days
-
-
-    def is_asset_valid(self, asset):
-        return bool(re.match("[A-Z]{1,4}", asset))
-
-
-    def are_days_valid(self, days):
-        if days.isdigit() and 30 <= int(days) <= 1000:
-            return True
-        else:
-            return False
 
 
 
@@ -136,7 +125,7 @@ class DualAverageCrossover:
 
 
     def visualize_data(self, data):
-        print("[Creating Graph]")
+        print("[Drawing Graph]")
 
         plt.style.use("fivethirtyeight")
 
@@ -156,7 +145,7 @@ class DualAverageCrossover:
 
 
     def execute(self):
-        if self.symbol is None or self.days is None:
+        if self.error == True:
             return
 
         # Store the buy and sell data into a variable
