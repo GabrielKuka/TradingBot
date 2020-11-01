@@ -15,7 +15,7 @@ def calc_rsi(closes, in_position):
 
         rsi_values = list(filter(lambda x: not numpy.isnan(x), rsi_values))
 
-        file_manager.apply_rsi_values("data/rsi.txt", str(rsi_values) + "\n\n")
+        file_manager.apply_rsi_values("files/rsi.txt", str(rsi_values) + "\n\n")
 
         last_rsi = rsi_values[-1]
 

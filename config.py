@@ -14,8 +14,12 @@ ALGORITHMS = {
     3: 'Money Flow Index'
 }
 
+BASE_URL = "https://data.alpaca.markets"
+
+ACCOUNT_URL = "https://paper-api.alpaca.markets"
+
 # Url to retrieve historical data
-BARS_URL = "https://data.alpaca.markets/v1/bars"
+BARS_URL = "{}/v1/bars".format(BASE_URL)
 
 # Url to retrieve live stream market data
-SOCKET_URL = "wss://data.alpaca.markets/stream"
+SOCKET_URL = "wss://{}/stream".format(BASE_URL[9:])

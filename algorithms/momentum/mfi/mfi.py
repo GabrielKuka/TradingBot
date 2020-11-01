@@ -1,11 +1,11 @@
 # This python script calculates the Money Flow Index for a particular asset
 
-
 import warnings, bars, re
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from helper.CSVReadWrite import CSVReadWrite
+from helper.ValidateString import ValidateString
 
 warnings.filterwarnings('ignore')
 
@@ -31,7 +31,7 @@ class MoneyFlowIndex:
         if bars_dict != False:
 
             # In case no error, write data to a file
-            csvfile = CSVReadWrite("data/ohlc/{}.csv".format(self.symbol),
+            csvfile = CSVReadWrite("files/ohlc/{}.csv".format(self.symbol),
                                    "Date,Open,High,Low,Close,Volume")
             csvfile.write_file(bars_dict, 't', 'o', 'h', 'l', 'c', 'v')
 
@@ -50,7 +50,7 @@ class MoneyFlowIndex:
         while True:
             asset = input("Enter asset => ")
 
-            if not self.is_asset_valid(asset):
+            if not ValidateString.is_asset_valid(asset):
                 print("\n[Asset Not Valid]\n")
                 print("1. Asset must be in capital.")
                 print("2. Asset must be at most 4 characters.")
@@ -60,7 +60,7 @@ class MoneyFlowIndex:
         while True:
             days = input("Days in the past to retrieve data => ")
 
-            if not self.are_days_valid(days):
+            if not ValidateString.are_days_valid(days):
                 print("\n[Value Not Valid]\n")
                 print("1. Days must be from 50 - 1000")
             else:
@@ -69,22 +69,11 @@ class MoneyFlowIndex:
         return asset, days
 
 
-    def is_asset_valid(self, asset):
-        return bool(re.match("[A-Z]{1,4}", asset))
-
-
-    def are_days_valid(self, days):
-        if days.isdigit() and 50 <= int(days) <= 1000:
-            return True
-        else:
-            return False
-
-
     def setup_dataframes(self):
         print('[Setting up dataframes]')
 
         # Get the data
-        self.bars_df = pd.read_csv("data/ohlc/{}.csv".format(self.symbol))
+        self.bars_df = pd.read_csv("files/ohlc/{}.csv".format(self.symbol))
 
         # Set the index
         self.bars_df = self.bars_df.set_index(pd.DatetimeIndex(self.bars_df['Date'].values));

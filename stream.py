@@ -5,7 +5,8 @@ from algorithms.momentum.dual_avg_crossover.dual_avg_crossover import DualAverag
 from algorithms.momentum.mfi import mfi
 from config import *
 from helper.ValidateString import ValidateString
-
+from account import *
+from longshort import *
 
 authenticated = False
 
@@ -15,7 +16,12 @@ in_position = False
 
 def begin():
     global ws
-    handle_command()
+
+    print("Welcome!")
+
+#    print(str(Account()))
+
+    handle_mode_command()
 
 
 def stream_trades(symbol):
@@ -31,19 +37,53 @@ def stream_minute_bars(symbol):
     ws.send(json.dumps(listen_message))
 
 
-def handle_command():
+def handle_mode_command():
+    while True:
+
+        print("Enter bot mode: ")
+        print("0. Exit\n1. Testing Mode\n2. Action Mode\n")
+        mode = input("=> ")
+
+        if mode.isdigit():
+            mode = int(mode)
+
+            if mode == 0:
+
+                print("\n[EXITING]")
+                exit()
+
+            if mode == 1:
+
+               handle_test_commands()
+               break
+
+            elif mode == 2:
+
+               print("Action mode on!")
+               ls = LongShort()
+               ls.execute()
+               break
+
+            else:
+                print("Invalid input.\n")
+        else:
+            print("You can either select 1 or 2.\n")
+
+def handle_test_commands():
     global ws
 
     while True:
-
+        print("\n[TESTING MODE]\n")
+        print("Choose one of the algorithms: ")
         for key in ALGORITHMS:
             print("{0}. {1}".format((key), ALGORITHMS[key]))
 
-        algo = int(input("Choose one of the algorithms => "))
+        algo = int(input("=> "))
 
         if algo == 0:
-            print("[EXITING]")
-            exit()
+            print("\n[EXITING]\n")
+            handle_mode_command()
+            break
         if algo == 1:
             # RSI
             print("[Trying to connect...]")
@@ -106,7 +146,7 @@ def authenticate( ):
     auth_data = {
         "action": "authenticate",
         "data": {"key_id": api_key, "secret_key": api_secret}
-     }
+    }
     ws.send(json.dumps(auth_data))
 
 

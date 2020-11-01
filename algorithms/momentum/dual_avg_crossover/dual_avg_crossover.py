@@ -3,10 +3,11 @@
 # when to sell.
 
 from helper.CSVReadWrite import CSVReadWrite
-import re, bars
+import re, bars, asyncio
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from time import perf_counter
 from datetime import datetime
 from interfaces.IMomentumAlgo import IMomentumAlgo
 from helper.ValidateString import ValidateString
@@ -25,13 +26,15 @@ class DualAverageCrossover(IMomentumAlgo):
         # Retrieve bars from API
         print("[Requesting Data]")
         bars_dict = bars.get_historical_data(self.symbol, self.days, 'day')
+
         if bars_dict != False:
+
             # Save the data into a file
-            csvfile = CSVReadWrite("data/ohlc/{}.csv".format(self.symbol), "Date,Open,High,Low,Close")
+            csvfile = CSVReadWrite("files/ohlc/{}.csv".format(self.symbol), "Date,Open,High,Low,Close")
             csvfile.write_file(bars_dict, 't', 'o', 'h', 'l', 'c')
 
             # Read the file
-            self.bars_df = pd.read_csv("data/ohlc/{}.csv".format(self.symbol))
+            self.bars_df = pd.read_csv("files/ohlc/{}.csv".format(self.symbol))
         else:
             self.error = True
 
@@ -145,13 +148,18 @@ class DualAverageCrossover(IMomentumAlgo):
 
 
     def execute(self):
+
         if self.error == True:
             return
-
+        t_start = perf_counter()
         # Store the buy and sell data into a variable
         buy_sell, data = self.buy_sell()
         data['Buy_Signal_Price'] = buy_sell[0]
         data['Sell_Signal_Price'] = buy_sell[1]
+
+        t_stop = perf_counter()
+        print("Executed in {}".format(str(t_stop-t_start)))
+
 
         # Vizualize the data!
         self.visualize_data(data)
