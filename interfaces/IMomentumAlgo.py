@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 
+
 class IMomentumAlgo(ABC):
-    '''Interface for Momentum Algorithms '''
+    """Interface for Momentum Algorithms """
 
     @abstractmethod
     def display_header(self):

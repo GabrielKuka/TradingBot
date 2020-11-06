@@ -1,6 +1,6 @@
 # Keys used to authenticate to Alpaca Platform
-api_key="PKEMGP5998C3OM6N3JU7"
-api_secret = "daGGEAtMFt3R6uSNv5XlSBU5irJEAnE1z5mOwU74"
+api_key="PK3NLNARB24PPO809FF9"
+api_secret = "atx0JpIGRw6KZ3NP5rxkCudRE3kSU52D3HHfdzAJ"
 
 HEADERS = {
         'APCA-API-KEY-ID': api_key,
@@ -11,7 +11,8 @@ ALGORITHMS = {
     0: 'EXIT',
     1: 'RSI',
     2: 'Dual Average Crossover',
-    3: 'Money Flow Index'
+    3: 'Money Flow Index',
+    4: 'Long Short'
 }
 
 BASE_URL = "https://data.alpaca.markets"
@@ -22,4 +23,4 @@ ACCOUNT_URL = "https://paper-api.alpaca.markets"
 BARS_URL = "{}/v1/bars".format(BASE_URL)
 
 # Url to retrieve live stream market data
-SOCKET_URL = "wss://{}/stream".format(BASE_URL[9:])
+SOCKET_URL = "wss://{}/stream".format(BASE_URL[8:])

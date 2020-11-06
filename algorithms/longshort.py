@@ -1,9 +1,9 @@
 import alpaca_trade_api as tradeapi
-import config, threading, time
+import threading
 from market import *
 from orders import *
 from account import *
-from data.connection import *
+
 
 class LongShort:
 
@@ -14,48 +14,28 @@ class LongShort:
         self.__orders = Orders()
         self.__account = Account()
 
+        # List of stocks
         stock_universe = ['F', 'AAL', 'CCL', 'AGNC', 'IBIO', 'BAC', 'GM',
-                          'SNAP', 'BA', 'TWTR', 'QCOM', 'INTC', 'MGM', 'NCLH',
-                         'GPRO', 'ACB', 'NIO', 'AMD', 'T', 'UBER']
+                          'SNAP', 'BA', 'TWTR']
 
-        self.all_stocks = []
+        # List of stocks with the percentage change
+        self.all_stocks = [[stock, 0] for stock in stock_universe]
 
-        for stock in stock_universe:
-            self.all_stocks.append([stock, 0])
-
+        # List of stocks to go long or short
         self.long = []
         self.short = []
 
+        # The amount of share to go long or short
         self.qty_long = 0
         self.qty_short = 0
 
+        # The amount of shares to go long or short after uncompleted orders
         self.adjusted_qty_long = None
         self.adjusted_qty_short = None
 
         self.blacklist = set()
-        self.long_amoung = 0
+        self.long_amount = 0
         self.short_amount = 0
-
-        self.till_close = None
-
-
-    def await_market_open(self):
-        ''' Wait until market opens '''
-
-        while True:
-
-            is_open = self.__market.is_market_opened()
-
-            if is_open:
-                break
-            else:
-                open_time = self.__market.get_open_time()
-                current_time = self.__market.get_current_time()
-                till_open = int((open_time - current_time)/60)
-
-                print("{} more minutes for stock market to open".format(str(till_open)))
-                time.sleep(60)
-
 
     def execute(self):
 
@@ -63,7 +43,7 @@ class LongShort:
         self.__orders.cancel_opened_orders()
 
         # Wait for market to open
-        t1 = threading.Thread(target=self.await_market_open)
+        t1 = threading.Thread(target=self.__market.await_market_open)
         t1.start()
         t1.join()
         print("[Market Opened]")
@@ -75,9 +55,9 @@ class LongShort:
             close_time = self.__market.get_close_time()
             current_time = self.__market.get_current_time()
 
-            self.till_close = close_time - current_time
+            till_close = close_time - current_time
 
-            if self.till_close < (60 * 15):
+            if till_close < (60 * 15):
 
                 # Close positions
                 print("Market closing soon.")
@@ -89,10 +69,9 @@ class LongShort:
 
                     qty = abs(int(float(position.qty)))
 
-                    t_submit_order = threading.Thread(target=self.submit_order, args=[position.symbol, qty, order_side])
-
-                    t_submit_order.start()
-                    t_submit_order.join()
+                    t_order = threading.Thread(target=self.submit_order, args=[position.symbol, qty, order_side])
+                    t_order.start()
+                    t_order.join()
 
                 print("Sleeping until market close.")
                 time.sleep(60 * 15)
@@ -103,7 +82,6 @@ class LongShort:
                 t_rebalance.join()
                 time.sleep(60)
 
-
     def rebalance(self):
         t_rerank = threading.Thread(target=self.rerank)
         t_rerank.start()
@@ -112,14 +90,13 @@ class LongShort:
         # Clear existing orders.
         orders = self.__orders.get_opened_orders()
         for order in orders:
-            self.__orders.cancel_order(order.id)
+            thread = threading.Thread(target=self.__orders.cancel_order,
+                                      args=[order.id])
+            thread.start()
+            thread.join()
 
         print("Going long on {}".format(str(self.long)))
         print("Going short on {}".format(str(self.short)))
-
-        # Remove positions that are no longer in the short or long list and
-        # make a list of positions that don't need to change. Adjust position
-        # quantities if needed.
 
         executed = [[], []]
         positions = self.__account.list_positions()
@@ -135,11 +112,9 @@ class LongShort:
 
                 side = 'sell' if position.side == 'long' else 'buy'
 
-                respSO = []
                 t_submit_order = threading.Thread(target=self.submit_order,
-                                 args=[position.symbol,
-                                       abs(int(float(position.qty))), side,
-                                      respSO])
+                                                  args=[position.symbol,
+                                                        abs(int(float(position.qty))), side])
 
                 t_submit_order.start()
                 t_submit_order.join()
@@ -147,12 +122,10 @@ class LongShort:
             elif pos_in_long:
 
                 if position.side == 'short':
-                    # Position changes from short to long. Clear short position
-                    # to prepare for long position
-                    respSO = []
+                    # Go long!
                     t_submit_order = threading.Thread(target=self.submit_order,
-                                     args=[position.symbol, abs(int(float(position.qty))),
-                                            'buy', respSO])
+                                                      args=[position.symbol, abs(int(float(position.qty))),
+                                                            'buy'])
                     t_submit_order.start()
                     t_submit_order.join()
                 else:
@@ -164,10 +137,10 @@ class LongShort:
 
                     side = 'sell' if diff > 0 else 'buy'
 
-                    respSO = []
                     t_submit_order = threading.Thread(target=self.submit_order,
-                                     args=[position.symbol, abs(diff), side,
-                                           respSO])
+                                                      args=[position.symbol, abs(diff), side])
+                    t_submit_order.start()
+                    t_submit_order.join()
                 executed[0].append(position.symbol)
                 self.blacklist.add(position.symbol)
 
@@ -175,12 +148,13 @@ class LongShort:
 
                 if position.side == 'long':
                     side = 'sell'
-                    respSO= []
-                    t_submit_order = threading.Thread(target=self.submit_order,
-                                     args=[position.symbol,
-                                           abs(int(float(position.qty))),
-                                           side, respSO])
 
+                    t_submit_order = threading.Thread(target=self.submit_order,
+                                                      args=[position.symbol,
+                                                            abs(int(float(position.qty))),
+                                                            side])
+                    t_submit_order.start()
+                    t_submit_order.join()
                 else:
 
                     pos_qty = abs(int(float(position.qty)))
@@ -190,29 +164,28 @@ class LongShort:
                     # diff < 0 -> too little shorts. Sell some.
 
                     side = 'buy' if diff > 0 else 'sell'
-                    respSO= []
+
                     t_submit_order = threading.Thread(target=self.submit_order,
-                                         args=[position.symbol, diff,
-                                               side, respSO])
+                                                      args=[position.symbol, diff,
+                                                            side])
                     t_submit_order.start()
                     t_submit_order.join()
 
                 executed[1].append(position.symbol)
                 self.blacklist.add(position.symbol)
 
-
         # Send orders to all remaining stocks in the long and short list.
-        respSendBOLong = []
-        t_batch_order_l = threading.Thread(target=self.submit_batch_order,
-                         args=[self.qty_long, self.long, 'buy', respSendBOLong])
-        t_batch_order_l.start()
-        t_batch_order_l.join()
-        respSendBOLong[0][0] += executed[0]
+        answer_bo_long = []
+        t_bo_long = threading.Thread(target=self.submit_batch_order,
+                                     args=[self.qty_long, self.long, 'buy', answer_bo_long])
+        t_bo_long.start()
+        t_bo_long.join()
+        answer_bo_long[0][0] += executed[0]
 
-        if len(respSendBOLong[0][1]) > 0:
-            # Handle rejected/incomplete orders and determine new quantities to purchase.
+        if len(answer_bo_long[0][1]) > 0:
+            # Handle incomplete orders and find new quantities
             get_tp_long = []
-            t_get_tp_long = threading.Thread(target=self.get_total_price, args=[respSendBOLong[0][0], get_tp_long])
+            t_get_tp_long = threading.Thread(target=self.get_total_price, args=[answer_bo_long[0][0], get_tp_long])
             t_get_tp_long.start()
             t_get_tp_long.join()
 
@@ -223,19 +196,21 @@ class LongShort:
         else:
             self.adjusted_qty_long = -1
 
-        respSendBOShort = []
+        answer_bo_short = []
         t_batch_order_sh = threading.Thread(target=self.submit_batch_order,
-                         args=[self.qty_short, self.short, 'sell', respSendBOShort])
+                                            args=[self.qty_short, self.short, 'sell', answer_bo_short])
         t_batch_order_sh.start()
         t_batch_order_sh.join()
-        respSendBOShort[0][0] += executed[1]
+        answer_bo_short[0][0] += executed[1]
 
-        if len(respSendBOShort[0][1]) > 0:
-            # Handle rejected/incomplete orders and determine new quantities to purchase.
+        # If there are failed orders
+        if len(answer_bo_short[0][1]) > 0:
+            # Handle them
             get_tp_short = []
-            t_get_tp_short = threading.Thread(target=self.get_total_price, args=[respSendBOShort[0][0], get_tp_short])
+            t_get_tp_short = threading.Thread(target=self.get_total_price, args=[answer_bo_short[0][0], get_tp_short])
             t_get_tp_short.start()
             t_get_tp_short.join()
+
             if get_tp_short[0] > 0:
                 self.adjusted_qty_short = self.short_amount // get_tp_short[0]
             else:
@@ -243,32 +218,33 @@ class LongShort:
         else:
             self.adjusted_qty_short = -1
 
-
-
-       # Reorder stocks that didn't throw an error so that the equity quota is reached.
+        # Reorder stocks that didn't throw an error so that the equity quota is reached.
         if self.adjusted_qty_long > -1:
             self.qty_long = int(self.adjusted_qty_long - self.qty_long)
-            for stock in respSendBOLong[0][0]:
-              respResendBOLong = []
-              tResendBOLong = threading.Thread(target=self.submit_order, args=[stock, self.qty_long, "buy", respResendBOLong])
-              tResendBOLong.start()
-              tResendBOLong.join()
+            for stock in answer_bo_long[0][0]:
+                answer = []
+                t_resend_bo_long = threading.Thread(target=self.submit_order,
+                                                    args=[stock, self.qty_long, "buy", answer])
+                t_resend_bo_long.start()
+                t_resend_bo_long.join()
 
         if self.adjusted_qty_short > -1:
             self.qty_short = int(self.adjusted_qty_short - self.qty_short)
-            for stock in respSendBOShort[0][0]:
-              respResendBOShort = []
-              tResendBOShort = threading.Thread(target=self.submit_order, args=[stock, self.qty_short, "sell", respResendBOShort])
-              tResendBOShort.start()
-              tResendBOShort.join()
-
+            for stock in answer_bo_short[0][0]:
+                answer = []
+                t_resend_bo_short = threading.Thread(target=self.submit_order,
+                                                     args=[stock, self.qty_short, "sell", answer])
+                t_resend_bo_short.start()
+                t_resend_bo_short.join()
 
     def rerank(self):
-        tRank = threading.Thread(target=self.rank)
-        tRank.start()
-        tRank.join()
 
-        # Grabs the top and bottom quarter of the sorted stock list to get the long and short lists.
+        # Rank stocks
+        t_rank = threading.Thread(target=self.rank)
+        t_rank.start()
+        t_rank.join()
+
+        # Grabs the top and bottom quarter of the sorted stock list.
         long_short_amount = len(self.all_stocks) // 4
 
         # Empty long and short list
@@ -278,14 +254,14 @@ class LongShort:
         # Grab the bottom 20% of the stocks to short and the top 20% to long
         for i, stock_field in enumerate(self.all_stocks):
             if i < long_short_amount:
-              self.short.append(stock_field[0])
+                self.short.append(stock_field[0])
             elif i > (len(self.all_stocks) - 1 - long_short_amount):
-              self.long.append(stock_field[0])
+                self.long.append(stock_field[0])
 
         equity = int(float(self.__account.equity()))
 
         # Use 30% of equity for shorting and 70% for taking long positions
-        self.short_amount = equity * 0.30
+        self.short_amount = equity * 0.45
         self.long_amount = equity - self.short_amount
 
         get_tp_long = []
@@ -301,77 +277,70 @@ class LongShort:
         self.qty_long = int(self.long_amount // get_tp_long[0])
         self.qty_short = int(self.short_amount // get_tp_short[0])
 
+    def rank(self):
+        # Ranks all stocks by percent change over the past 10 minutes (higher is better).
+        t_get_total_price = threading.Thread(target=self.get_percent_changes)
+        t_get_total_price.start()
+        t_get_total_price.join()
 
+        # Sort the stocks by percentage change
+        self.all_stocks.sort(key=lambda k: k[1])
 
-    def submit_order(self, symbol, qty, order_side, resp):
+    def submit_order(self, symbol, qty, order_side, answer=None):
+        if answer is None:
+            answer = []
 
         side = order_side.capitalize()
 
         if qty > 0:
-           try:
-               self.alpaca.submit_order(symbol, qty, order_side, "market", "day")
+            try:
+                self.alpaca.submit_order(symbol, qty, order_side, "market", "day")
 
-               print("{0}ing {1} shares of {2} -> COMPLETED".format(side, str(qty), symbol))
+                print("{0}ing {1} shares of {2} -> COMPLETED".format(side, str(qty), symbol))
 
-               resp.append(True)
-           except:
-               print("{0}ing {1} shares of {2} -> FAILED".format(side, str(qty), symbol))
+                answer.append(True)
+            except:
+                print("{0}ing {1} shares of {2} -> FAILED".format(side, str(qty), symbol))
 
-               resp.append(False)
-
+                answer.append(False)
 
     def submit_batch_order(self, qty, stocks, side, resp):
 
         completed = []
-        incompleted = []
+        uncompleted = []
 
         for stock in stocks:
-          if self.blacklist.isdisjoint({stock}):
-            respSO = []
-            tSubmitOrder = threading.Thread(target=self.submit_order,
-                                            args=[stock, qty, side, respSO])
-            tSubmitOrder.start()
-            tSubmitOrder.join()
+            if self.blacklist.isdisjoint({stock}):
+                answer = []
+                t_submit_order = threading.Thread(target=self.submit_order,
+                                                  args=[stock, qty, side, answer])
+                t_submit_order.start()
+                t_submit_order.join()
 
-            if not respSO[0]:
-              # Stock order did not go through, add it to incomplete.
-              incompleted.append(stock)
-            else:
-              completed.append(stock)
-            respSO.clear()
+                if not answer[0]:
+                    # Stock order did not go through, add it to incomplete.
+                    uncompleted.append(stock)
+                else:
+                    completed.append(stock)
+                answer.clear()
 
-        resp.append([completed, incompleted])
+        resp.append([completed, uncompleted])
 
-
-    # Get the total price of the array of input stocks.
-    def get_total_price(self, stocks, resp):
-      totalPrice = 0
-      for stock in stocks:
-        bars = self.alpaca.get_barset(stock, "minute", 1)
-        totalPrice += bars[stock][0].c
-      resp.append(totalPrice)
-
+    # Get the total price of all the stocks
+    def get_total_price(self, stocks, ans):
+        total_price = 0
+        for stock in stocks:
+            bars = self.alpaca.get_barset(stock, "minute", 1)
+            total_price += bars[stock][0].c
+        ans.append(total_price)
 
     # Get percent changes of the stock prices over the past 10 minutes.
     def get_percent_changes(self):
 
-      for i, stock in enumerate(self.all_stocks):
+        for i, stock in enumerate(self.all_stocks):
+            bars = self.alpaca.get_barset(stock[0], 'minute', 10)
 
-        bars = self.alpaca.get_barset(stock[0], 'minute', 10)
+            close_price = bars[stock[0]][len(bars[stock[0]]) - 1].c
+            open_price = bars[stock[0]][0].o
 
-        close_price = bars[stock[0]][len(bars[stock[0]]) - 1].c
-        open_price = bars[stock[0]][0].o
-
-        self.all_stocks[i][1] = (close_price - open_price) / open_price
-
-
-    # Mechanism used to rank the stocks, the basis of the Long-Short Equity Strategy.
-    def rank(self):
-      # Ranks all stocks by percent change over the past 10 minutes (higher is better).
-      tGetPC = threading.Thread(target=self.get_percent_changes)
-      tGetPC.start()
-      tGetPC.join()
-
-      # Sort the stocks in place by the percent change field (marked by pc).
-      self.all_stocks.sort(key=lambda x: x[1])
-
+            self.all_stocks[i][1] = (close_price - open_price) / open_price

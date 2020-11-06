@@ -1,7 +1,7 @@
 import alpaca_trade_api as trade_api
 import datetime
 
-class Connection:
+class AlpacaConnection:
 
     def __init__(self, public_key, secret_key, url):
         # Connect to ALPACA

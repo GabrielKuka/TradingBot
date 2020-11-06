@@ -1,15 +1,15 @@
 import config, time
 import concurrent.futures as cf
-from data.connection import *
+from connection.alpaca_connection import *
+
 
 class Account:
 
     def __init__(self):
 
-        conn = Connection(config.api_key, config.api_secret, config.ACCOUNT_URL)
+        conn = AlpacaConnection(config.api_key, config.api_secret, config.ACCOUNT_URL)
 
         with cf.ThreadPoolExecutor() as executor:
-
             t1 = executor.submit(conn.retrieve_account)
             t2 = executor.submit(conn.retrieve_portfolio)
 
@@ -19,22 +19,33 @@ class Account:
 
         self.setup_data()
 
-
     def setup_data(self):
-       self.__status = self.account.status
-       self.__buying_power = float(self.account.buying_power)
-       self.__equity = float(self.account.equity)
-       self.__gain_loss = self.__equity - float(self.account.last_equity)
-       self.__cash = float(self.account.cash)
-       self.__portfolio_value = float(self.account.portfolio_value)
+        self.__status = self.account.status
+        self.__buying_power = float(self.account.buying_power)
+        self.__equity = float(self.account.equity)
+        self.__gain_loss = self.__equity - float(self.account.last_equity)
+        self.__cash = float(self.account.cash)
+        self.__portfolio_value = float(self.account.portfolio_value)
 
     def account_status(self):
         return self.__status
 
-
     def list_positions(self):
 
         return self.portfolio
+
+    def has_position(self, symbol):
+        has_pos = False
+        positions = self.list_positions()
+        position = None
+
+        for pos in positions:
+            if pos.symbol == symbol and pos.qty > 0:
+                has_pos = True
+                position = pos
+                break
+
+        return (has_pos, position)
 
     def portfolio_value(self):
         return self.__portfolio_value
@@ -42,7 +53,6 @@ class Account:
     def buying_power(self):
 
         return self.__buying_power
-
 
     def gain_loss(self):
 
@@ -58,8 +68,8 @@ class Account:
         status = "Account Status: {}\n".format(self.account_status())
         equity = "Equity: ${:,}\n".format(self.equity())
         buying_power = "Buying Power: ${:,}\n".format(self.buying_power())
-        balance_change= "Today's change: {:.2f}\n".format(self.gain_loss())
-        portfolio_value ="Total portfolio value: ${:,}\n".format(self.portfolio_value())
+        balance_change = "Today's change: {:.2f}\n".format(self.gain_loss())
+        portfolio_value = "Total portfolio value: ${:,}\n".format(self.portfolio_value())
         positions = self.portfolio
 
         if len(positions) == 0:
@@ -70,7 +80,7 @@ class Account:
 
             for index, pos in enumerate(positions, start=1):
                 portfolio += "{}. {} shares of {}\n".format(index, pos.qty,
-                                                              pos.symbol)
+                                                            pos.symbol)
 
             portfolio += portfolio_value
 

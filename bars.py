@@ -1,13 +1,15 @@
-import config, requests, json
 from datetime import datetime
+
+import config
+import requests
 
 
 def get_historical_data(symbol, number_of_lines, timeframe):
-    ''' Timeframe could be 1Min (or minute), 5Min, 15Min, day (or 1D) '''
+    """ Timeframe could be 1Min (or minute), 5Min, 15Min, day (or 1D) """
 
     request_url = "{0}/{1}?symbols={2}&limit={3}".format(config.BARS_URL,
-                                                      timeframe, symbol,
-                                                      number_of_lines)
+                                                         timeframe, symbol,
+                                                         number_of_lines)
 
     req_errors = requests.exceptions
 
@@ -20,26 +22,23 @@ def get_historical_data(symbol, number_of_lines, timeframe):
         return False
 
     except req_errors.TooManyRedirects:
-       # Bad URL
-       print("Bad URL. Try a different one.")
-       return False
+        # Bad URL
+        print("Bad URL. Try a different one.")
+        return False
 
     except req_errors.HTTPError as http_error:
-       raise SystemError(http_error)
+        raise SystemError(http_error)
 
     except req_errors.RequestException:
-       print("There was an error. Are you connected?")
-       return False
+        print("There was an error. Are you connected?")
+        return False
 
     else:
-       # This is a dictionary!
-       data = req.json()
+        # This is a dictionary!
+        data = req.json()
 
-       # Convert timestamp to regular date
-       for row in data[symbol]:
-           row['t'] = datetime.fromtimestamp(row['t']).strftime("%Y-%m-%d")
+        # Convert timestamp to regular date
+        for row in data[symbol]:
+            row['t'] = datetime.fromtimestamp(row['t']).strftime("%Y-%m-%d")
 
-
-       return data[symbol]
-
-
+        return data[symbol]
