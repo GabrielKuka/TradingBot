@@ -34,10 +34,21 @@ def append_to_file(filename, data, temp=False):
             file.write('{}\n'.format(data))
 
 
+def write_to_file(filename, data, temp=False):
+    if filename == '':
+        print("Enter a file name first!")
+    else:
+        base_path = 'temp_files/' if temp else ''
+        file_path = '{}{}'.format(base_path, filename)
+
+        with open(file_path, 'w') as file:
+            file.write('{}\n'.format(data))
+
+
 def delete_file(filename, temp=False):
     import os
 
-    base_path = 'temp_files/' if temp else ''
+    base_path = 'temp_files/' if temp else 'files/ohlc/'
     file_path = '{}{}'.format(base_path, filename)
 
     if os.path.exists(file_path):

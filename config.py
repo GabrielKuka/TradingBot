@@ -12,7 +12,8 @@ ALGORITHMS = {
     1: 'RSI',
     2: 'Dual Average Crossover',
     3: 'Money Flow Index',
-    4: 'Long Short'
+    4: 'Long Short',
+    5: 'Bollinger Bands'
 }
 
 BASE_URL = "https://data.alpaca.markets"

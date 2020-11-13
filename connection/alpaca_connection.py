@@ -1,5 +1,5 @@
 import alpaca_trade_api as trade_api
-import datetime
+
 
 class AlpacaConnection:
 
@@ -8,9 +8,7 @@ class AlpacaConnection:
         self._api = trade_api.REST(public_key, secret_key, url)
 
     def get_alpaca(self):
-
         return self._api
-
 
     def retrieve_account(self):
         self.account = self._api.get_account()
@@ -21,4 +19,3 @@ class AlpacaConnection:
         self.portfolio = self._api.list_positions()
 
         return self.portfolio
-

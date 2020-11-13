@@ -35,6 +35,9 @@ class MoneyFlowIndex(IAlgorithm):
     def ws_close(self, ws):
         self.ws.on_close(ws)
 
+        # Delete csv file
+        file_manager.delete_file('temp_files/{}.csv'.format(self.symbol))
+
         # Close plot's process if alive
         if self.p is not None:
             self.p.terminate()
@@ -92,7 +95,7 @@ class MoneyFlowIndex(IAlgorithm):
             new_entry['sell_signal'],
             mfi
         )
-        file_manager.append_to_file('files/ohlc/{}.csv'.format(self.symbol), new_entry_str)
+        file_manager.append_to_file('temp_files/{}.csv'.format(self.symbol), new_entry_str)
 
         # Add entry to dataframe
         self.df = self.df.append(new_entry, ignore_index=True)
@@ -157,26 +160,26 @@ class MoneyFlowIndex(IAlgorithm):
 
         if bars_dict:
             # In case no error, write data to a file
-            csv_file = CSVReadWrite("files/ohlc/{}.csv".format(self.symbol),
+            csv_file = CSVReadWrite("temp_files/{}.csv".format(self.symbol),
                                     "Date,Close,High,Low,Volume")
             csv_file.write_file(bars_dict, 't', 'c', 'h', 'l', 'v')
 
             if self.mode == 'active':
-                self.df = pd.read_csv('files/ohlc/{}.csv'.format(self.symbol))
+                self.df = pd.read_csv('temp_files/{}.csv'.format(self.symbol))
                 self.df = self.df.set_index(pd.DatetimeIndex(self.df['Date'].values).strftime("%H:%M"))
                 self.df['buy_signal'] = np.nan
                 self.df['sell_signal'] = np.nan
             else:
                 # Get the data
-                self.hist_df = pd.read_csv("files/ohlc/{}.csv".format(self.symbol))
+                self.hist_df = pd.read_csv("temp_files/{}.csv".format(self.symbol))
                 self.hist_df = self.hist_df.set_index(pd.DatetimeIndex(self.hist_df['Date'].values).strftime("%H:%M"))
         else:
             self.error = True
 
     def display_header(self):
-        print("\n\t\t\t~+~+~+~+~+~+~+~+~+~+~+~+~\n")
-        print("\t\t Money Flow Index Algorithm")
-        print("\n\t\t\t~+~+~+~+~+~+~+~+~+~+~+~+~")
+        print("\n~+~+~+~+~+~+~+~+~+~+~+~+~\n")
+        print("Money Flow Index Algorithm")
+        print("\n~+~+~+~+~+~+~+~+~+~+~+~+~")
 
     def calc_mfi(self, data):
         # Calc typical price
@@ -276,7 +279,7 @@ class MoneyFlowIndex(IAlgorithm):
         data['MFI'] = np.nan
         data['MFI'][14:] = self.mfi
 
-        data.to_csv(r'files/ohlc/{}.csv'.format(self.symbol), index=False)
+        data.to_csv(r'temp_files/{}.csv'.format(self.symbol), index=False)
 
     def buy_sell(self, data):
 
@@ -428,7 +431,7 @@ class MoneyFlowIndex(IAlgorithm):
 
     def animate_graph(self, i):
         # Read file
-        file_df = pd.read_csv('files/ohlc/{}.csv'.format(self.symbol))
+        file_df = pd.read_csv('temp_files/{}.csv'.format(self.symbol))
 
         # Clear and plot
         self.ax1.clear()
@@ -513,5 +516,4 @@ class MoneyFlowIndex(IAlgorithm):
 
             # Delete the file
             file_manager.delete_file('SPY.csv'.format(self.symbol))
-
 

@@ -1,20 +1,26 @@
-import websocket, json
+import json, websocket
 from config import *
+
 
 class WebSocket:
 
-    def __init__(self):
+    def __init__(self, i_algo):
 
+        # Keeps track of auth status
         self.authenticated = False
-        self.ws = websocket.WebSocketApp(SOCKET_URL,
-                        on_message = lambda ws, message: self.on_message(ws, message),
-                        on_open = lambda ws: self.on_open(ws),
-                        on_close = lambda ws: self.on_close(ws)
-                                        )
 
+        # Setup websocket
+        self.ws = websocket.WebSocketApp(SOCKET_URL,
+                                         on_open=lambda ws: i_algo.ws_open(ws),
+                                         on_close=lambda ws: i_algo.ws_close(ws),
+                                         on_message=lambda ws, message: i_algo.ws_message(ws, message)
+                                         )
+
+    def connect_socket(self):
         self.ws.run_forever()
 
-
+    def disconnect_socket(self):
+        self.ws.close()
 
     def on_open(self, ws):
         print("[CONNECTION OPENED]")
@@ -22,24 +28,13 @@ class WebSocket:
         # Authenticate
         self.authenticate()
 
-        # Stream something
-        self.stream_trades('SPY')
-
-
     def on_close(self, ws):
-        print("[CONNECTION CLOSED]")
-
+        print('[CONNECTION CLOSED]')
 
     def on_message(self, ws, message):
-
-        message = json.loads(message)
-
+        # Check authentication
         if not self.authenticated:
             self.check_auth(message)
-
-
-        print(message['data']['p'])
-
 
     def authenticate(self):
         auth_data = {
@@ -48,7 +43,6 @@ class WebSocket:
         }
 
         self.ws.send(json.dumps(auth_data))
-
 
     def check_auth(self, message):
 
@@ -62,15 +56,11 @@ class WebSocket:
             print("[UNAUTHORIZED]")
             self.authenticated = False
 
+    def stream_minute_bars(self, symbol):
+        listen_message = {"action": "listen", "data": {"streams":
+                                                           ["AM.{}".format(symbol)]}}
+        self.ws.send(json.dumps(listen_message))
 
     def stream_trades(self, symbol):
         listen_message = {"action": "listen", "data": {"streams": ["T.{}".format(symbol)]}}
         self.ws.send(json.dumps(listen_message))
-
-
-    def stream_minute_bars(self, symbol):
-        listen_message = {"action": "listen", "data": {"streams":
-                                                       ["AM.{}".format(symbol)]}}
-        self.ws.send(json.dumps(listen_message))
-
-

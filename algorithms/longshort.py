@@ -1,8 +1,8 @@
 import alpaca_trade_api as tradeapi
 import threading
-from market import *
-from orders import *
-from account import *
+from connection.market import *
+from connection.orders import *
+from connection.account import *
 
 
 class LongShort:
