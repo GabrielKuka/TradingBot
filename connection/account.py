@@ -65,7 +65,7 @@ class Account:
         status = "Account Status: {}\n".format(self.account_status())
         equity = "Equity: ${:,}\n".format(self.equity())
         buying_power = "Buying Power: ${:,}\n".format(self.buying_power())
-        balance_change = "Today's change: {:.2f}\n".format(self.gain_loss())
+        balance_change = "Today's change: ${:.2f}\n".format(self.gain_loss())
         portfolio_value = "Total portfolio value: ${:,}\n".format(self.portfolio_value())
         positions = self.portfolio
 

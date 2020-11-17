@@ -7,20 +7,20 @@ class WebSocket:
     def __init__(self, i_algo):
 
         # Keeps track of auth status
-        self.authenticated = False
+        self.__authenticated = False
 
         # Setup websocket
-        self.ws = websocket.WebSocketApp(SOCKET_URL,
-                                         on_open=lambda ws: i_algo.ws_open(ws),
-                                         on_close=lambda ws: i_algo.ws_close(ws),
-                                         on_message=lambda ws, message: i_algo.ws_message(ws, message)
-                                         )
+        self.__ws = websocket.WebSocketApp(SOCKET_URL,
+                                           on_open=lambda ws: i_algo.ws_open(ws),
+                                           on_close=lambda ws: i_algo.ws_close(ws),
+                                           on_message=lambda ws, message: i_algo.ws_message(ws, message)
+                                           )
 
     def connect_socket(self):
-        self.ws.run_forever()
+        self.__ws.run_forever()
 
     def disconnect_socket(self):
-        self.ws.close()
+        self.__ws.close()
 
     def on_open(self, ws):
         print("[CONNECTION OPENED]")
@@ -33,7 +33,7 @@ class WebSocket:
 
     def on_message(self, ws, message):
         # Check authentication
-        if not self.authenticated:
+        if not self.__authenticated:
             self.check_auth(message)
 
     def authenticate(self):
@@ -42,7 +42,7 @@ class WebSocket:
             "data": {"key_id": api_key, "secret_key": api_secret}
         }
 
-        self.ws.send(json.dumps(auth_data))
+        self.__ws.send(json.dumps(auth_data))
 
     def check_auth(self, message):
 
@@ -51,16 +51,16 @@ class WebSocket:
 
         if action == "authorization" and result == "authorized":
             print("[Authenticated]")
-            self.authenticated = True
+            self.__authenticated = True
         else:
             print("[UNAUTHORIZED]")
-            self.authenticated = False
+            self.__authenticated = False
 
     def stream_minute_bars(self, symbol):
         listen_message = {"action": "listen", "data": {"streams":
                                                            ["AM.{}".format(symbol)]}}
-        self.ws.send(json.dumps(listen_message))
+        self.__ws.send(json.dumps(listen_message))
 
     def stream_trades(self, symbol):
         listen_message = {"action": "listen", "data": {"streams": ["T.{}".format(symbol)]}}
-        self.ws.send(json.dumps(listen_message))
+        self.__ws.send(json.dumps(listen_message))

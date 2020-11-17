@@ -139,7 +139,7 @@ class RSI(IAlgorithm):
 
     def retrieve_data(self):
 
-        bars_dict = bars.get_historical_data(self.symbol, 50, '1Min')
+        bars_dict = bars.get_historical_data(self.symbol, 100, '1Min')
 
         if bars_dict:
             # In case no error, write data to a file
@@ -313,11 +313,9 @@ class RSI(IAlgorithm):
         self.ax1.scatter(file_df['Date'], file_df['buy_signal'], marker='^', color='green', alpha=1.0)
         self.ax1.scatter(file_df['Date'], file_df['sell_signal'], marker='v', color='red', alpha=1.0)
 
-        # Remove x ticks of prices chart
+        # Remove x ticks
         self.ax1.set_xticks([])
-
-        # Rotate x ticks of RSI chart
-        plt.xticks(rotation=45, fontsize=7)
+        self.ax2.set_xticks([])
 
         # Remove grids
         self.ax1.grid(False)
@@ -340,19 +338,19 @@ class RSI(IAlgorithm):
 
     def plot_hist_graph(self, data):
         plt.style.use('fivethirtyeight')
-        fig, (ax1, ax2) = plt.subplots(2, 1, facecolor='black')
+        fig, (ax1, ax2) = plt.subplots(2, 1, facecolor='white')
 
         fig.suptitle('RSI Algorithm', color='white')
 
         # Set the background color
-        ax1.set_facecolor('black')
-        ax2.set_facecolor('black')
+        ax1.set_facecolor('white')
+        ax2.set_facecolor('white')
 
         # Set axis values colors
-        ax1.tick_params(axis='x', colors='white')
-        ax1.tick_params(axis='y', colors='white')
-        ax2.tick_params(axis='x', colors='white')
-        ax2.tick_params(axis='y', colors='white')
+        ax1.tick_params(axis='x', colors='black')
+        ax1.tick_params(axis='y', colors='black')
+        ax2.tick_params(axis='x', colors='black')
+        ax2.tick_params(axis='y', colors='black')
 
         # Change the color of the left and bottom axis
         ax1.spines['bottom'].set_color('gray')
@@ -383,9 +381,9 @@ class RSI(IAlgorithm):
         ax2.axhline(y=self.RSI_OVERBOUGHT, lw=2, linestyle='--', color='red')
 
         # Set titles and labels
-        ax1.set_ylabel('Closing Prices for {} in USD'.format(self.symbol), color='white')
-        ax2.set_ylabel('RSI Values', color='white')
-        ax2.set_xlabel('Time', color='white')
+        ax1.set_ylabel('Closing Prices for {} in USD'.format(self.symbol), color='black')
+        ax2.set_ylabel('RSI Values', color='black')
+        ax2.set_xlabel('Time', color='black')
 
         # Show the legends on both plots
         ax1.legend(loc='upper left', framealpha=0.2, fancybox=True)
@@ -395,6 +393,7 @@ class RSI(IAlgorithm):
         plt.xticks(rotation=45, fontsize=7)
 
         ax1.set_xticks([])
+        ax2.set_xticks([])
 
         # Show the plots
         plt.show()

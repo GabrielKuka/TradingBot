@@ -20,8 +20,6 @@ class RSI(IAlgorithm):
     def ws_open(self, ws):
         self.ws.on_open(ws)
 
-        # # Get the last 14 closes
-        # self.closes = list(self.df['Close'])[-14:]
 
         # Stream something
         self.ws.stream_trades(self.symbol)
@@ -59,8 +57,6 @@ class RSI(IAlgorithm):
         # Get the required data: close price, time
         bar_data = msg['data']
         close_price = bar_data['p']
-        close_time = datetime.fromtimestamp(int(str(bar_data['t'])[:-9])).strftime("%H:%M")
-        # print('Time: {}\tPrice: {}'.format(close_time, close_price))
 
         # Append close price to the list
         self.closes.append(close_price)
@@ -93,15 +89,12 @@ class RSI(IAlgorithm):
         # Print the received data + RSI
         print('{}\tPrice: {}\tRSI: {}'.format(self.counter, close_price, str(rsi)))
 
-    def __init__(self, mode):
+    def __init__(self):
 
         # RSI Constants
         self.RSI_PERIOD = 14
         self.RSI_OVERSOLD = 30
         self.RSI_OVERBOUGHT = 70
-
-        # Bot mode
-        self.mode = mode
 
         # In case of any errors
         self.error = False
@@ -109,90 +102,39 @@ class RSI(IAlgorithm):
         # Enter asset
         self.enter_data()
 
-        if self.mode == 'active':
+        # Counter when data is received
+        self.counter = 0
 
-            # Counter when data is received
-            self.counter = 0
+        # Previous buy price
+        self.buy_price = 0
 
-            # Previous buy price
-            self.buy_price = 0
+        # Setup Plot
+        plt.style.use('seaborn')
+        self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1)
 
-            # Setup Plot
-            plt.style.use('seaborn')
-            self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1)
+        # Create a dataframe
+        self.df = pd.DataFrame()
 
-            # Create a dataframe
-            self.df = pd.DataFrame()
+        # Tracks position status
+        self.in_position = False
 
-            # Tracks position status
-            self.in_position = False
+        # Stores closing prices
+        self.closes = []
 
-            # Stores closing prices
-            self.closes = []
+        # Account Data
+        self.__market = Market()
+        self.__orders = Orders()
+        self.__account = Account()
 
-            # Account Data
-            self.__market = Market()
-            self.__orders = Orders()
-            self.__account = Account()
+        # Qty to be bought or sold
+        self.QTY = 100
 
-            # Qty to be bought or sold
-            self.QTY = 100
+        # Init socket
+        self.ws = WebSocket(self)
 
-            # Init socket
-            self.ws = WebSocket(self)
+        # Setup the plot's process
+        self.p = Process(target=self.plot_live_graph)
 
-            # Setup the plot's process
-            self.p = Process(target=self.plot_live_graph)
-
-        elif self.mode == 'test':
-            self.hist_df = pd.DataFrame()
-
-    def retrieve_data(self):
-
-        bars_dict = bars.get_historical_data(self.symbol, 100, '1Min')
-
-        if bars_dict:
-            # In case no error, write data to a file
-            csv_file = CSVReadWrite("temp_files/{}.csv".format(self.symbol),
-                                    "Date,Close")
-            csv_file.write_file(bars_dict, 't', 'c')
-
-            if self.mode == 'active':
-                self.df = pd.read_csv('temp_files/{}.csv'.format(self.symbol))
-                self.df = self.df.set_index(pd.DatetimeIndex(self.df['Date'].values).strftime("%H:%M"))
-                self.df['buy_signal'] = np.nan
-                self.df['sell_signal'] = np.nan
-            else:
-                self.hist_df = pd.read_csv('temp_files/{}.csv'.format(self.symbol))
-                self.hist_df = self.hist_df.set_index(pd.DatetimeIndex(self.hist_df['Date'].values).strftime("%H:%M"))
-        else:
-            self.error = True
-
-    def pre_calculate(self, data):
-
-        # Get price difference from the previous days
-        delta = data['Close'].diff(1)
-        delta = delta.dropna()
-
-        # Get positive and negative values
-        up, down = delta.copy(), delta.copy()
-        up[up < 0] = 0
-        down[down > 0] = 0
-
-        # Get the average gain and the average loss
-        avg_gain = up.rolling(window=self.RSI_PERIOD).mean()
-        avg_loss = abs(down.rolling(window=self.RSI_PERIOD).mean())
-
-        # Calculate the Relative Strength (RS)
-        RS = avg_gain / avg_loss
-
-        # Calculate the Relative Strength Index (RSI)
-        r_s_i = 100.0 - (100.0 / (1 + RS))
-
-        data['RSI'] = r_s_i
-
-        # Write to file
-        data.to_csv(r'temp_files/{}.csv'.format(self.symbol), index=False)
 
     def buy_sell(self, data):
         if data['RSI'] != 0:
@@ -238,26 +180,6 @@ class RSI(IAlgorithm):
                     t.join()
                 else:
                     print('Nothing to buy. Already in position')
-
-    def buy_sell_historical(self, data):
-
-        buy_signal = []
-        sell_signal = []
-
-        for i in range(len(data['Close'])):
-            if data['RSI'][i] > self.RSI_OVERBOUGHT:
-                # Sell
-                buy_signal.append(np.nan)
-                sell_signal.append(data['Close'][i])
-            elif data['RSI'][i] < self.RSI_OVERSOLD:
-                # Buy
-                buy_signal.append(data['Close'][i])
-                sell_signal.append(np.nan)
-            else:
-                buy_signal.append(np.nan)
-                sell_signal.append(np.nan)
-
-        return buy_signal, sell_signal
 
     def close_position_before_market_close(self):
 
@@ -364,121 +286,33 @@ class RSI(IAlgorithm):
         ani = animation.FuncAnimation(self.fig, self.animate_graph)
         plt.show()
 
-    def plot_hist_graph(self, data):
-        plt.style.use('fivethirtyeight')
-        fig, (ax1, ax2) = plt.subplots(2, 1, facecolor='white')
-
-        fig.suptitle('RSI Algorithm', color='white')
-
-        # Set the background color
-        ax1.set_facecolor('white')
-        ax2.set_facecolor('white')
-
-        # Set axis values colors
-        ax1.tick_params(axis='x', colors='black')
-        ax1.tick_params(axis='y', colors='black')
-        ax2.tick_params(axis='x', colors='black')
-        ax2.tick_params(axis='y', colors='black')
-
-        # Change the color of the left and bottom axis
-        ax1.spines['bottom'].set_color('gray')
-        ax1.spines['left'].set_color('gray')
-        ax2.spines['bottom'].set_color('gray')
-        ax2.spines['left'].set_color('gray')
-
-        # Remove grids
-        ax1.grid(False)
-        ax2.grid(False)
-
-        # Disable the top and right axis
-        ax1.spines['top'].set_visible(False)
-        ax1.spines['right'].set_visible(False)
-        ax2.spines['top'].set_visible(False)
-        ax2.spines['right'].set_visible(False)
-
-        # Plot the closing prices and RSI
-        ax1.plot(data.index, data['Close'], color='blue', lw=2, label='Closing Prices', alpha=0.5)
-        ax2.plot(data.index, data['RSI'], color='green', lw=2, label='RSI', alpha=1.0)
-
-        # Draw the buy and sell signals
-        ax1.scatter(data.index, data['Buy'], color='green', marker='^', alpha=1.0)
-        ax1.scatter(data.index, data['Sell'], color='red', marker='v', alpha=1.0)
-
-        # Draw the limit lines
-        ax2.axhline(y=self.RSI_OVERSOLD, lw=2, linestyle='--', color='green')
-        ax2.axhline(y=self.RSI_OVERBOUGHT, lw=2, linestyle='--', color='red')
-
-        # Set titles and labels
-        ax1.set_ylabel('Closing Prices for {} in USD'.format(self.symbol), color='black')
-        ax2.set_ylabel('RSI Values', color='black')
-        ax2.set_xlabel('Time', color='black')
-
-        # Show the legends on both plots
-        ax1.legend(loc='upper left', framealpha=0.2, fancybox=True)
-        ax2.legend(loc='upper left', framealpha=0.2)
-
-        # Rotate x ticks
-        plt.xticks(rotation=45, fontsize=7)
-
-        ax1.set_xticks([])
-
-        # Show the plots
-        plt.show()
-
     def execute(self):
 
-        if self.mode == 'active':
-            # # Cancel existing orders
-            # self.__orders.cancel_opened_orders()
-            #
-            # # Liquidate position if it exists
-            # self.liquidate_position()
-            #
-            # # Wait for market to open
-            # t = Thread(target=self.__market.await_market_open)
-            # t.start()
-            # t.join()
-            # print("[Market Opened]")
+        # Cancel existing orders
+        self.__orders.cancel_opened_orders()
 
-            # # Retrieve Data
-            # self.retrieve_data()
+        # Liquidate position if it exists
+        self.liquidate_position()
 
-            # # Calculate Metric
-            # self.pre_calculate(self.df)
+        # Wait for market to open
+        t = Thread(target=self.__market.await_market_open)
+        t.start()
+        t.join()
+        print("[Market Opened]")
 
-            # Create temp file
-            file = open('temp_files/{}.csv'.format(self.symbol), 'w')
-            file.write('Date,Close,buy_signal,sell_signal,RSI\n')
-            file.close()
+        # Create temp file
+        file = open('temp_files/{}.csv'.format(self.symbol), 'w')
+        file.write('Date,Close,buy_signal,sell_signal,RSI\n')
+        file.close()
 
-            # Start Algo
-            t_socket = Thread(target=self.ws.connect_socket)
-            t_socket.start()
+        # Start Algo
+        t_socket = Thread(target=self.ws.connect_socket)
+        t_socket.start()
 
-            # Run the plot's process
-            self.p.start()
+        # Run the plot's process
+        self.p.start()
 
-            t_socket.join()
+        t_socket.join()
 
-        elif self.mode == 'test':
-
-            # Retrieve historical data
-            self.retrieve_data()
-
-            # Calculate metric
-            self.pre_calculate(self.hist_df)
-
-            # Get buy and sell signals
-            self.hist_df = self.hist_df[self.RSI_PERIOD - 1:]
-            self.hist_df['Buy'] = self.buy_sell_historical(self.hist_df)[0]
-            self.hist_df['Sell'] = self.buy_sell_historical(self.hist_df)[1]
-
-            # Plot the graph
-            self.plot_hist_graph(self.hist_df)
-
-        else:
-            print('Weird!')
-
-
-rsi = RSI('active')
-rsi.execute()
+        # Delete csv file
+        file_manager.delete_file('SPY.csv'.format(self.symbol))

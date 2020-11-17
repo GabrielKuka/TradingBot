@@ -24,6 +24,28 @@ from connection.market import Market
 warnings.filterwarnings('ignore')
 
 
+def enter_data():
+    asset, days = None, None
+
+    while True:
+        asset = input("Enter asset => ")
+
+        if not ValidateString.is_asset_valid(asset):
+            print("\n[Asset Not Valid]\n")
+            print("1. Asset must be in capital.")
+            print("2. Asset must be at most 4 characters.")
+        else:
+            break
+
+    return asset
+
+
+def display_header():
+    print("\n~+~+~+~+~+~+~+~+~+~+~+~+~\n")
+    print("Money Flow Index Algorithm")
+    print("\n~+~+~+~+~+~+~+~+~+~+~+~+~")
+
+
 class MoneyFlowIndex(IAlgorithm):
 
     def ws_open(self, ws):
@@ -68,9 +90,10 @@ class MoneyFlowIndex(IAlgorithm):
         low_price = round(bar_data['l'], 2)
         volume = bar_data['v']
 
+        print(self.df[-14:])
+
         # Calc MFI
         mfi = self.calc_mfi(self.df[-14:])
-
         # New Entry
         new_entry = {
             'Date': close_time,
@@ -95,6 +118,8 @@ class MoneyFlowIndex(IAlgorithm):
             new_entry['sell_signal'],
             mfi
         )
+
+        # Add entry to file
         file_manager.append_to_file('temp_files/{}.csv'.format(self.symbol), new_entry_str)
 
         # Add entry to dataframe
@@ -109,7 +134,7 @@ class MoneyFlowIndex(IAlgorithm):
         self.error = False
 
         # Display Header
-        self.display_header()
+        display_header()
 
         # Bot mode
         self.mode = mode
@@ -121,7 +146,7 @@ class MoneyFlowIndex(IAlgorithm):
         self.MFI_MARGIN = 3
 
         # Assign variables
-        self.symbol = self.enter_data()
+        self.symbol = enter_data()
 
         if self.mode == 'active':
             # Setup Plot
@@ -137,51 +162,54 @@ class MoneyFlowIndex(IAlgorithm):
             self.df = pd.DataFrame()
 
             # Qty to purchase
-            self.QTY = 50
+            self.QTY = 1000
 
             # Tracks position status
             self.in_position = False
+
+            # Keeps track of the buying price
+            self.buy_price = 0
 
             # Init websocket
             self.ws = WebSocket(self)
 
             # Setup the plot's process
             self.p = Process(target=self.plot_live_graph)
+
         elif self.mode == 'test':
             self.hist_df = pd.DataFrame()
             self.mfi = None
-        else:
-            print('Weird')
 
     def retrieve_data(self):
 
         print("[Requesting Data]")
-        bars_dict = bars.get_historical_data(self.symbol, 70, '1Min')
 
-        if bars_dict:
-            # In case no error, write data to a file
-            csv_file = CSVReadWrite("temp_files/{}.csv".format(self.symbol),
-                                    "Date,Close,High,Low,Volume")
-            csv_file.write_file(bars_dict, 't', 'c', 'h', 'l', 'v')
+        # Create a csv file
+        csv_file = CSVReadWrite("temp_files/{}.csv".format(self.symbol),
+                                "Date,Close,High,Low,Volume")
 
-            if self.mode == 'active':
+        if self.mode == 'active':
+            bars_dict = bars.get_historical_data(self.symbol, 100, '1Min')
+            if bars_dict:
+                csv_file.write_file(bars_dict, 't', 'c', 'h', 'l', 'v')
+
                 self.df = pd.read_csv('temp_files/{}.csv'.format(self.symbol))
                 self.df = self.df.set_index(pd.DatetimeIndex(self.df['Date'].values).strftime("%H:%M"))
                 self.df['buy_signal'] = np.nan
                 self.df['sell_signal'] = np.nan
-            else:
+
+        elif self.mode == 'test':
+            bars_dict = bars.get_historical_data(self.symbol, 500, 'day')
+            if bars_dict:
+                csv_file.write_file(bars_dict, 't', 'c', 'h', 'l', 'v')
+
                 # Get the data
                 self.hist_df = pd.read_csv("temp_files/{}.csv".format(self.symbol))
-                self.hist_df = self.hist_df.set_index(pd.DatetimeIndex(self.hist_df['Date'].values).strftime("%H:%M"))
-        else:
-            self.error = True
-
-    def display_header(self):
-        print("\n~+~+~+~+~+~+~+~+~+~+~+~+~\n")
-        print("Money Flow Index Algorithm")
-        print("\n~+~+~+~+~+~+~+~+~+~+~+~+~")
+                self.hist_df = self.hist_df.set_index(
+                    pd.DatetimeIndex(self.hist_df['Date'].values).strftime("%Y:%m:%d"))
 
     def calc_mfi(self, data):
+
         # Calc typical price
         typical_price = (data['High'] + data['Low'] + data['Close']) / 3
 
@@ -209,37 +237,15 @@ class MoneyFlowIndex(IAlgorithm):
         positive_flows_sum = sum(positive_flows)
         negative_flows_sum = sum(negative_flows)
 
+
         # Money Flow Ratio
         mfr = positive_flows_sum / negative_flows_sum
 
         # Calculate the Money Flow Index
         money_flow_index = 100 - (100 / (1 + mfr))
 
+
         return money_flow_index
-
-    def enter_data(self):
-        asset, days = None, None
-
-        while True:
-            asset = input("Enter asset => ")
-
-            if not ValidateString.is_asset_valid(asset):
-                print("\n[Asset Not Valid]\n")
-                print("1. Asset must be in capital.")
-                print("2. Asset must be at most 4 characters.")
-            else:
-                break
-
-        # while True:
-        #     days = input("Days in the past to retrieve data => ")
-        #
-        #     if not ValidateString.are_days_valid(days):
-        #         print("\n[Value Not Valid]\n")
-        #         print("1. Days must be from 50 - 1000")
-        #     else:
-        #         break
-
-        return asset
 
     def pre_calculate(self, data):
 
@@ -255,11 +261,11 @@ class MoneyFlowIndex(IAlgorithm):
 
         for i in range(1, len(typical_price)):
             if typical_price[i] > typical_price[i - 1]:
-                positive_flows.append(rmf[i-1])
+                positive_flows.append(rmf[i - 1])
                 negative_flows.append(0)
             elif typical_price[i] < typical_price[i - 1]:
                 positive_flows.append(0)
-                negative_flows.append(rmf[i-1])
+                negative_flows.append(rmf[i - 1])
             else:
                 positive_flows.append(0)
                 negative_flows.append(0)
@@ -269,10 +275,10 @@ class MoneyFlowIndex(IAlgorithm):
         negative_mf_sum = []
 
         for i in range(self.PERIOD - 1, len(positive_flows)):
-            positive_mf_sum.append(sum(positive_flows[i+1-self.PERIOD:i+1]))
+            positive_mf_sum.append(sum(positive_flows[i + 1 - self.PERIOD:i + 1]))
 
         for i in range(self.PERIOD - 1, len(negative_flows)):
-            negative_mf_sum.append(sum(negative_flows[i+1-self.PERIOD:i+1]))
+            negative_mf_sum.append(sum(negative_flows[i + 1 - self.PERIOD:i + 1]))
 
         self.mfi = 100 * (np.array(positive_mf_sum) / (np.array(negative_mf_sum) + np.array(positive_mf_sum)))
 
@@ -286,16 +292,24 @@ class MoneyFlowIndex(IAlgorithm):
         if data['MFI'] > self.HIGH - self.MFI_MARGIN:
             # Sell
             if self.in_position:
-                # Submit order
-                t = Thread(target=self.__orders.submit_order, args=[self.symbol, self.QTY, 'sell'])
-                t.start()
-                t.join()
+                if self.buy_price <= data['Close']:
+                    # Submit order
+                    t = Thread(target=self.__orders.submit_order, args=[self.symbol, self.QTY, 'sell'])
+                    t.start()
 
-                # Change position status
-                self.in_position = False
+                    # Change position status
+                    self.in_position = False
 
-                # Add sell signal
-                data['sell_signal'] = data['Close']
+                    # Add sell signal
+                    data['sell_signal'] = data['Close']
+
+                    # Reset buy price
+                    self.buy_price = 0
+
+                    # Wait for order to finish
+                    t.join()
+                else:
+                    print('We bought at a higher price. Can\'t sell now.')
             else:
                 print('Sell signal generated. No asset to sell.')
 
@@ -305,13 +319,18 @@ class MoneyFlowIndex(IAlgorithm):
                 # Submit order
                 t = Thread(target=self.__orders.submit_order, args=[self.symbol, self.QTY, 'buy'])
                 t.start()
-                t.join()
 
                 # Change position status
                 self.in_position = True
 
+                # Set buying price
+                self.buy_price = data['Close']
+
                 # Add buy signal
                 data['buy_signal'] = data['Close']
+
+                # Wait for order to finish
+                t.join()
             else:
                 print('Buy signal generated. Already in position.')
 
@@ -360,25 +379,17 @@ class MoneyFlowIndex(IAlgorithm):
         print('[Drawing Graph]')
 
         plt.style.use("fivethirtyeight")
-        fig, (ax1, ax2) = plt.subplots(2, 1, facecolor='black')
+        fig, (ax1, ax2) = plt.subplots(2, 1)
 
-        fig.suptitle('Money Flow Index', color='white')
+        fig.suptitle('Money Flow Index')
 
-        # Set background color
-        ax1.set_facecolor('black')
-        ax2.set_facecolor('black')
-
-        # Set axis values colors
-        ax1.tick_params(axis='y', colors='white')
-        ax2.tick_params(axis='y', colors='white')
-        ax2.tick_params(axis='x', colors='white')
-
-        # Remove x ticks of the second chart
+        # Remove x ticks
         ax1.xaxis.set_ticks([])
+        ax2.xaxis.set_ticks([])
 
         # Set labels for axis
-        ax1.set_ylabel('{} price in $ (USD)'.format(self.symbol), color='white')
-        ax2.set_ylabel('MFI Values', color='white')
+        ax1.set_ylabel('{} price in $ (USD)'.format(self.symbol))
+        ax2.set_ylabel('MFI Values')
 
         # Remove grids
         ax1.grid(False)
@@ -393,12 +404,12 @@ class MoneyFlowIndex(IAlgorithm):
         # Change the color of the left and bottom axis
         ax1.spines['bottom'].set_color('gray')
         ax1.spines['left'].set_color('gray')
-        ax2.spines['bottom'].set_color('black')
-        ax2.spines['left'].set_color('black')
+        ax2.spines['bottom'].set_color('white')
+        ax2.spines['left'].set_color('white')
 
         # Plot prices and MFI
-        ax1.plot(data.index, data['Close'], color='yellow', label="Close Price", alpha=0.5, linewidth=2)
-        ax2.plot(data.index, data['MFI'], label='MFI', linewidth=2)
+        ax1.plot(data.index, data['Close'], color='black', label="Close Price", alpha=0.5, lw=2)
+        ax2.plot(data.index, data['MFI'], label='MFI', lw=2)
 
         # Draw buy and sell signals
         ax1.scatter(data.index, data['Buy'], color="green",
@@ -411,14 +422,11 @@ class MoneyFlowIndex(IAlgorithm):
         ax2.axhline(20, color='green', linestyle='--', linewidth=2)
         ax2.axhline(80, color='green', linestyle='--', linewidth=2)
         ax2.axhline(90, color='red', linestyle='--', linewidth=2)
-        ax2.axhline(y=(self.LOW + self.MFI_MARGIN), color='yellow', linestyle='--', linewidth=1)
-        ax2.axhline(y=(self.HIGH - self.MFI_MARGIN), color='yellow', linestyle='--', linewidth=1)
+        ax2.axhline(y=(self.LOW + self.MFI_MARGIN), color='brown', linestyle='--', linewidth=1)
+        ax2.axhline(y=(self.HIGH - self.MFI_MARGIN), color='brown', linestyle='--', linewidth=1)
 
         # Show legend
         ax1.legend(loc='upper left')
-
-        # Rotate x axis values
-        plt.xticks(rotation=45, fontsize=5)
 
         # Shot plot
         plt.show()
@@ -449,11 +457,9 @@ class MoneyFlowIndex(IAlgorithm):
         self.ax2.axhline(y=(self.HIGH - self.MFI_MARGIN), color='brown', linestyle='--')
         self.ax2.axhline(y=(self.LOW + self.MFI_MARGIN), color='brown', linestyle='--')
 
-        # Remove x ticks of prices chart
+        # Remove x ticks
         self.ax1.set_xticks([])
-
-        # Rotate x ticks of RSI chart
-        plt.xticks(rotation=45, fontsize=7)
+        self.ax2.set_xticks([])
 
         # Remove grids
         self.ax1.grid(False)
@@ -470,17 +476,17 @@ class MoneyFlowIndex(IAlgorithm):
             return
 
         if self.mode == 'active':
-            # Cancel existing orders
-            self.__orders.cancel_opened_orders()
-
-            # Liquidate position if it exists
-            self.liquidate_position()
-
-            # Wait for market to open
-            t = Thread(target=self.__market.await_market_open)
-            t.start()
-            t.join()
-            print("[Market Opened]")
+            # # Cancel existing orders
+            # self.__orders.cancel_opened_orders()
+            #
+            # # Liquidate position if it exists
+            # self.liquidate_position()
+            #
+            # # Wait for market to open
+            # t = Thread(target=self.__market.await_market_open)
+            # t.start()
+            # t.join()
+            # print("[Market Opened]")
 
             # Retrieve historical data about the asset
             self.retrieve_data()
@@ -492,11 +498,12 @@ class MoneyFlowIndex(IAlgorithm):
             t_socket = Thread(target=self.ws.connect_socket)
             t_socket.start()
 
-            # Run the plot's process
-            self.p.start()
+            # # Run the plot's process
+            # self.p.start()
 
             # Wait for socket to finish
             t_socket.join()
+
         elif self.mode == 'test':
 
             # Retrieve historical data
@@ -514,6 +521,5 @@ class MoneyFlowIndex(IAlgorithm):
             # Plot historical graph
             self.plot_hist_graph(self.hist_df)
 
-            # Delete the file
-            file_manager.delete_file('SPY.csv'.format(self.symbol))
-
+        # Delete the file
+        file_manager.delete_file('SPY.csv'.format(self.symbol))

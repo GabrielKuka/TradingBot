@@ -73,8 +73,8 @@ class LongShort:
                     t_order.start()
                     t_order.join()
 
-                print("Sleeping until market close.")
-                time.sleep(60 * 15)
+                print("Exiting..")
+                exit()
             else:
                 # Rebalance portfolio
                 t_rebalance = threading.Thread(target=self.rebalance)
@@ -260,7 +260,7 @@ class LongShort:
 
         equity = int(float(self.__account.equity()))
 
-        # Use 30% of equity for shorting and 70% for taking long positions
+        # Use 45% of equity for shorting and 55% for taking long positions
         self.short_amount = equity * 0.45
         self.long_amount = equity - self.short_amount
 
@@ -279,9 +279,9 @@ class LongShort:
 
     def rank(self):
         # Ranks all stocks by percent change over the past 10 minutes (higher is better).
-        t_get_total_price = threading.Thread(target=self.get_percent_changes)
-        t_get_total_price.start()
-        t_get_total_price.join()
+        t_get_change = threading.Thread(target=self.get_percent_changes)
+        t_get_change.start()
+        t_get_change.join()
 
         # Sort the stocks by percentage change
         self.all_stocks.sort(key=lambda k: k[1])

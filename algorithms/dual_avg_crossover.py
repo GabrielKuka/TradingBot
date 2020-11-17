@@ -22,6 +22,28 @@ from connection.market import Market
 from connection.orders import Orders
 
 
+def display_header():
+    print("\n~+~+~+~+~+~+~+~+~+~+~+~+~\n")
+    print("Dual Simple Average Crossover Algorithm")
+    print("\n~+~+~+~+~+~+~+~+~+~+~+~+~")
+
+
+def enter_data():
+    asset, days = None, None
+
+    while True:
+        asset = input("\nEnter asset => ")
+
+        if not ValidateString.is_asset_valid(asset):
+            print("\n[Asset Not Valid]\n")
+            print("1. Asset must be in capital.")
+            print("2. Asset must be at most 4 characters.")
+        else:
+            break
+
+    return asset
+
+
 class DualAverageCrossover(IAlgorithm):
 
     def ws_open(self, ws):
@@ -118,9 +140,9 @@ class DualAverageCrossover(IAlgorithm):
         self.mode = mode
 
         # Display Header
-        self.display_header()
+        display_header()
 
-        self.symbol = self.enter_data()
+        self.symbol = enter_data()
 
         if self.mode == 'active':
             # Setup Plot
@@ -147,6 +169,9 @@ class DualAverageCrossover(IAlgorithm):
             # Init websocket
             self.ws = WebSocket(self)
 
+            # Track buy price
+            self.buy_price = 0
+
             # Setup the plot's process
             self.p = Process(target=self.plot_live_graph)
 
@@ -158,52 +183,30 @@ class DualAverageCrossover(IAlgorithm):
     def retrieve_data(self):
         # Retrieve bars from API
         print("[Requesting Data]")
-        bars_dict = bars.get_historical_data(self.symbol, 100, '1Min')
 
-        if bars_dict:
-            # Save the data into a file
-            csv_file = CSVReadWrite("temp_files/{}.csv".format(self.symbol), "Date,Close")
-            csv_file.write_file(bars_dict, 't', 'c')
+        # Create CSV File
+        csv_file = CSVReadWrite("temp_files/{}.csv".format(self.symbol), "Date,Close")
 
-            if self.mode == 'active':
+        if self.mode == 'active':
+
+            bars_dict = bars.get_historical_data(self.symbol, 200, '1Min')
+
+            if bars_dict:
+                csv_file.write_file(bars_dict, 't', 'c')
                 self.df = pd.read_csv('temp_files/{}.csv'.format(self.symbol))
                 self.df = self.df.set_index(pd.DatetimeIndex(self.df['Date'].values).strftime("%H:%M"))
                 self.df['buy_signal'] = np.nan
                 self.df['sell_signal'] = np.nan
-            elif self.mode == 'test':
+            else:
+                self.error = True
+        elif self.mode == 'test':
+            bars_dict = bars.get_historical_data(self.symbol, 400, 'day')
+            if bars_dict:
+                csv_file.write_file(bars_dict, 't', 'c')
                 self.hist_df = pd.read_csv('temp_files/{}.csv'.format(self.symbol))
                 self.hist_df = self.hist_df.set_index(pd.DatetimeIndex(self.hist_df['Date'].values))
-
-        else:
-            self.error = True
-
-    def enter_data(self):
-        asset, days = None, None
-
-        while True:
-            asset = input("\nEnter asset => ")
-
-            if not ValidateString.is_asset_valid(asset):
-                print("\n[Asset Not Valid]\n")
-                print("1. Asset must be in capital.")
-                print("2. Asset must be at most 4 characters.")
             else:
-                break
-
-        # while True:
-        #     days = input("\nDays in the past to retrieve data [30 - 1000] => ")
-        #     if not ValidateString.are_days_valid(days):
-        #         print("\n[Value Not Valid]\n")
-        #         print("1. Days must be from 30 - 1000.")
-        #     else:
-        #         break
-
-        return asset
-
-    def display_header(self):
-        print("\n~+~+~+~+~+~+~+~+~+~+~+~+~\n")
-        print("Dual Simple Average Crossover Algorithm")
-        print("\n~+~+~+~+~+~+~+~+~+~+~+~+~")
+                self.error = True
 
     def pre_calculate(self, data):
 
@@ -221,31 +224,44 @@ class DualAverageCrossover(IAlgorithm):
         if data['SMA30'] > data['SMA100']:
             # Sell
             if self.in_position:
-                # Submit order
-                # t = Thread(target=self.__orders.submit_order, args=[self.symbol, self.QTY, 'sell'])
-                # t.start()
-                # t.join()
+                if self.buy_price <= data['Close']:
+                    # Submit order
+                    t = Thread(target=self.__orders.submit_order, args=[self.symbol, self.QTY, 'sell'])
+                    t.start()
 
-                # Change position status
-                self.in_position = False
+                    # Change position status
+                    self.in_position = False
 
-                # Add sell signal
-                data['sell_signal'] = data['Close']
+                    # Add sell signal
+                    data['sell_signal'] = data['Close']
+
+                    # Reset buy price
+                    self.buy_price = 0
+
+                    # Wait for order to finish
+                    t.join()
+                else:
+                    print('We bought at a higher price. Can\'t sell now.')
             else:
                 print('Sell signal generated. No asset to sell.')
         elif data['SMA100'] < data['SMA30']:
             # Buy
             if not self.in_position:
                 # Submit order
-                # t = Thread(target=self.__orders.submit_order, args=[self.symbol, self.QTY, 'buy'])
-                # t.start()
-                # t.join()
+                t = Thread(target=self.__orders.submit_order, args=[self.symbol, self.QTY, 'buy'])
+                t.start()
 
                 # Change position status
                 self.in_position = True
 
                 # Add buy signal
                 data['buy_signal'] = data['Close']
+
+                # Set buy price
+                self.buy_price = data['Close']
+
+                # Wait for order to finish
+                t.join()
 
     def liquidate_position(self):
         has_position = self.__account.has_position(self.symbol)
@@ -352,7 +368,7 @@ class DualAverageCrossover(IAlgorithm):
     def plot_live_graph(self):
         self.fig.suptitle("Dual Moving Averages Crossover")
 
-        ani = animation.FuncAnimation(self.fig, self.animate_graph, interval=600)
+        ani = animation.FuncAnimation(self.fig, self.animate_graph)
         plt.show()
 
     def animate_graph(self, i):
@@ -372,18 +388,19 @@ class DualAverageCrossover(IAlgorithm):
         # Remove grid
         self.ax.grid(False)
 
+        self.ax.xaxis.set_ticks([])
+
         # Show the legend
         self.ax.legend(loc='upper left')
 
         # Set labels
         self.ax.set_ylabel('Close Price of {} in $'.format(self.symbol))
-        self.ax.set_xlabel('Time')
-        self.ax.tick_params(axis='x', rotation=45)
-        plt.xticks(fontsize=5)
 
     def execute(self):
 
         if self.error:
+            # Delete csv file
+            file_manager.delete_file('temp_files/{}.csv'.format(self.symbol))
             return
 
         if self.mode == 'active':
@@ -430,7 +447,4 @@ class DualAverageCrossover(IAlgorithm):
 
             # Plot graph
             self.plot_hist_graph(self.hist_df)
-
-        else:
-            print('Weird!')
 

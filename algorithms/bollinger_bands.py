@@ -111,7 +111,7 @@ class BollingerBands(IAlgorithm):
         self.buy_sell(new_entry)
 
         # Add entry to file
-        new_entry_str = '{},{},{},{},{},{},{},{}'.format(
+        new_entry_str = '\n{},{},{},{},{},{},{},{}'.format(
             close_time, close_price,
             new_entry['buy_signal'], new_entry['sell_signal'],
             new_entry['SMA'], new_entry['STD'],
@@ -133,7 +133,7 @@ class BollingerBands(IAlgorithm):
 
         # Calc the STD
         sma = sum(closes) / self.PERIOD
-        std = self.std(closes)
+        std = self.std(closes, sma)
 
         # Calc Upper band and lower band
         upper = sma + (2 * std)
@@ -141,13 +141,10 @@ class BollingerBands(IAlgorithm):
 
         return sma, std, upper, lower
 
-    def std(self, data):
-
-        # Mean of the data
-        sma = sum(data) / self.PERIOD
+    def std(self, data, mean):
 
         # Square deviations
-        deviations = [(x - sma) ** 2 for x in data]
+        deviations = [(x - mean) ** 2 for x in data]
 
         # Variance
         variance = sum(deviations) / self.PERIOD
@@ -172,7 +169,6 @@ class BollingerBands(IAlgorithm):
         self.symbol = enter_data()
 
         if self.mode == 'active':
-
             # Setup Plot
             plt.style.use('seaborn')
             self.fig, self.ax = plt.subplots()
@@ -186,7 +182,10 @@ class BollingerBands(IAlgorithm):
             self.df = pd.DataFrame()
 
             # Qty to purchase
-            self.QTY = 50
+            self.QTY = 1000
+
+            # Track buy price
+            self.buy_price = 0
 
             # Tracks position status
             self.in_position = False
@@ -201,28 +200,34 @@ class BollingerBands(IAlgorithm):
             self.p = Process(target=self.plot_live_graph)
 
         elif self.mode == 'test':
+            # self.position = False
             self.hist_df = pd.DataFrame()
 
     def retrieve_data(self):
 
-        bars_dict = bars.get_historical_data(self.symbol, 100, '1Min')
+        # In case no error, write data to a file
+        csv_file = CSVReadWrite("temp_files/{}.csv".format(self.symbol),
+                                "Date,Close")
 
-        if bars_dict:
-            # In case no error, write data to a file
-            csv_file = CSVReadWrite("temp_files/{}.csv".format(self.symbol),
-                                    "Date,Close")
-            csv_file.write_file(bars_dict, 't', 'c')
-
-            if self.mode == 'active':
+        if self.mode == 'active':
+            bars_dict = bars.get_historical_data(self.symbol, 100, '1Min')
+            if bars_dict:
+                csv_file.write_file(bars_dict, 't', 'c')
                 self.df = pd.read_csv('temp_files/{}.csv'.format(self.symbol))
                 self.df = self.df.set_index(pd.DatetimeIndex(self.df['Date'].values).strftime("%H:%M"))
                 self.df['buy_signal'] = np.nan
                 self.df['sell_signal'] = np.nan
             else:
-                self.hist_df = pd.read_csv('temp_files/{}.csv'.format(self.symbol))
-                self.hist_df = self.hist_df.set_index(pd.DatetimeIndex(self.hist_df['Date'].values).strftime("%H:%M"))
+                self.error = True
         else:
-            self.error = True
+            bars_dict = bars.get_historical_data(self.symbol, 100, 'day')
+            if bars_dict:
+                csv_file.write_file(bars_dict, 't', 'c')
+                self.hist_df = pd.read_csv('temp_files/{}.csv'.format(self.symbol))
+                self.hist_df = self.hist_df.set_index(
+                    pd.DatetimeIndex(self.hist_df['Date'].values).strftime("%Y:%m:%d"))
+            else:
+                self.error = True
 
     def pre_calculate(self, data):
 
@@ -245,16 +250,24 @@ class BollingerBands(IAlgorithm):
             # Sell!
             print('Sell signal!')
             if self.in_position:
-                # Run thread to submit order
-                t = Thread(target=self.__orders.submit_order, args=[self.symbol, self.QTY, 'sell'])
-                t.start()
-                t.join()
+                if self.buy_price <= data['Close']:
+                    # Run thread to submit order
+                    t = Thread(target=self.__orders.submit_order, args=[self.symbol, self.QTY, 'sell'])
+                    t.start()
 
-                # Change position status
-                self.in_position = False
+                    # Change position status
+                    self.in_position = False
 
-                # Add sell signal
-                data['sell_signal'] = data['Close']
+                    # Reset buy price
+                    self.buy_price = 0
+
+                    # Add sell signal
+                    data['sell_signal'] = data['Close']
+
+                    # Wait for order to finish
+                    t.join()
+                else:
+                    print('We bought at a higher price. Can\'t sell now.')
             else:
                 print('Nothing to sell.')
         elif data['Close'] < data['Lower']:
@@ -264,13 +277,18 @@ class BollingerBands(IAlgorithm):
                 # Run thread to submit order
                 t = Thread(target=self.__orders.submit_order, args=[self.symbol, self.QTY, 'buy'])
                 t.start()
-                t.join()
 
                 # Change position status
                 self.in_position = True
 
+                # Set buy price
+                self.buy_price = data['Close']
+
                 # Add buy signal
                 data['buy_signal'] = data['Close']
+
+                # Wait for order to finish
+                t.join()
             else:
                 print('Already in position.')
 
@@ -322,18 +340,12 @@ class BollingerBands(IAlgorithm):
 
     def plot_hist_graph(self, data):
         plt.style.use('fivethirtyeight')
-        fig = plt.figure(figsize=(12.2, 6.4), facecolor='black')
+        fig = plt.figure(figsize=(12.2, 6.4), facecolor='white')
 
         # Add the subplot
         ax = fig.add_subplot(111)
 
-        # Set background color
-        ax.set_facecolor('black')
-        ax.set_facecolor('black')
-
-        # Set axis values colors
-        ax.tick_params(axis='x', colors='white')
-        ax.tick_params(axis='y', colors='white')
+        ax.xaxis.set_ticks([])
 
         # Change the color of the left and bottom axis
         ax.spines['bottom'].set_color('gray')
@@ -354,7 +366,7 @@ class BollingerBands(IAlgorithm):
         ax.plot(x_axis, data['Lower'], color='brown', lw=1, label='Lower', alpha=0.5)
 
         # Plot the closing price and the moving average
-        ax.plot(x_axis, data['Close'], color='gold', lw=3, label='Close Price', alpha=0.5)
+        ax.plot(x_axis, data['Close'], color='black', lw=3, label='Close Price', alpha=0.5)
         ax.plot(x_axis, data['SMA'], color='blue', lw=1, label='Simple Moving Average')
 
         # Add the buy and sell signals
@@ -362,9 +374,9 @@ class BollingerBands(IAlgorithm):
         ax.scatter(x_axis, data['Sell'], label='Sell', alpha=1, color='red', marker='v')
 
         # Set the title and show the plot
-        ax.set_title("Bollinger Band for {}".format(self.symbol), color='white')
-        ax.set_ylabel('USD Price ($)', color='white')
-        ax.set_xlabel('Date', color='white')
+        ax.set_title("Bollinger Bands for {}".format(self.symbol), color='black')
+        ax.set_ylabel('USD Price ($)', color='black')
+        ax.set_xlabel('Time', color='black')
         plt.xticks(rotation=45, fontsize=7)
         ax.legend(loc='upper left', framealpha=0.2, fancybox=True)
         plt.show()
@@ -372,7 +384,7 @@ class BollingerBands(IAlgorithm):
     def plot_live_graph(self):
         self.fig.suptitle("Price of {} over time".format(self.symbol))
 
-        ani = animation.FuncAnimation(self.fig, self.animate_graph, interval=600)
+        ani = animation.FuncAnimation(self.fig, self.animate_graph)
         plt.show()
 
     def animate_graph(self, i):
@@ -393,9 +405,7 @@ class BollingerBands(IAlgorithm):
 
         # Set labels
         self.ax.set_ylabel("Price of {} in $".format(self.symbol))
-        self.ax.set_xlabel("Time")
-        self.ax.tick_params(axis='x', rotation=45)
-        plt.xticks(fontsize=5)
+        self.ax.xaxis.set_ticks([])
 
     def execute(self):
         if self.error:
@@ -421,11 +431,15 @@ class BollingerBands(IAlgorithm):
             # Calculate parameters
             self.pre_calculate(self.df)
 
+            # Run the web socket
+            t_socket = Thread(target=self.ws.connect_socket)
+            t_socket.start()
+
             # Run the plot's process
             self.p.start()
 
-            # Run socket
-            self.ws.connect_socket()
+            # Wait for thread to finish work
+            t_socket.join()
 
         elif self.mode == 'test':
 
@@ -436,7 +450,7 @@ class BollingerBands(IAlgorithm):
             self.pre_calculate(self.hist_df)
 
             # Get buy and sell signals
-            self.hist_df = self.hist_df[self.PERIOD - 1:]
+            self.hist_df = self.hist_df[self.PERIOD-1:]
             self.hist_df['Buy'] = self.buy_sell_historical(self.hist_df)[0]
             self.hist_df['Sell'] = self.buy_sell_historical(self.hist_df)[1]
 

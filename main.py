@@ -3,14 +3,18 @@ from algorithms.rsi import *
 from algorithms.dual_avg_crossover import DualAverageCrossover
 from algorithms.mfi import MoneyFlowIndex
 from algorithms import mfi
+from algorithms.high_speed.rsi import RSI
+from algorithms.high_speed.bollinger import BollingerBands
 from algorithms.longshort import *
-from config import *
+from authentication import Auth
+
+auth = Auth()
 
 
 def begin():
     print("Welcome!")
 
-    #   print(str(Account()))
+    auth.execute()
 
     handle_mode_command()
 
@@ -19,7 +23,7 @@ def handle_mode_command():
     while True:
 
         print("Enter bot mode: ")
-        print("0. Exit\n1. Testing Mode\n2. Action Mode\n\n")
+        print("0. Exit\n1. Testing\n2. Live Trading\n3. High Speed Trading\n4. Switch to Another Account\n5. Print Account Data\n")
         mode = input("=> ")
 
         if mode.isdigit():
@@ -38,6 +42,16 @@ def handle_mode_command():
                 handle_active_mode()
                 break
 
+            elif mode == 3:
+                handle_high_speed_mode()
+                break
+
+            elif mode == 4:
+                auth.change_credentials()
+
+            elif mode == 5:
+                print(Account())
+
             else:
                 print("Invalid input.\n")
         else:
@@ -46,10 +60,10 @@ def handle_mode_command():
 
 def handle_active_mode():
     while True:
-        print("\n[ACTIVE MODE]\n")
+        print("\n[LIVE TRADING MODE]\n")
         print("Choose one of the algorithms: ")
 
-        list_algos()
+        list_algos('live')
 
         algo = input("\n=> ")
 
@@ -81,12 +95,42 @@ def handle_active_mode():
                 print("\n[UNKNOWN COMMAND]\n")
 
 
+def handle_high_speed_mode():
+    while True:
+        print('\n[HIGH SPEED MODE]\n')
+        print('Choose one of the algorithms: ')
+
+        list_algos('high_speed')
+
+        algo = input('\n=> ')
+
+        if algo.isdigit():
+            algo = int(algo)
+
+            if algo == 0:
+                handle_mode_command()
+                break
+            elif algo == 1:
+                # RSI
+                rsi = RSI()
+                rsi.execute()
+            elif algo == 2:
+                # Bollinger
+                bb = BollingerBands()
+                bb.execute()
+            else:
+                print('Invalid input')
+
+        else:
+            print('Invalid input')
+
+
 def handle_test_mode():
     while True:
         print("\n[TESTING MODE]\n")
         print("Choose one of the algorithms: ")
 
-        list_algos()
+        list_algos('test')
 
         algo = input("\n=> ")
 
@@ -112,18 +156,25 @@ def handle_test_mode():
                 algo.execute()
 
             elif algo == 4:
-                pass
-
-            elif algo == 5:
                 algo = BollingerBands('test')
                 algo.execute()
+
             else:
                 print("\n[UNKNOWN COMMAND]\n")
 
 
-def list_algos():
-    for key, algo in ALGORITHMS.items():
-        print("{0}. {1}".format(key, algo))
+def list_algos(which):
+    from config import LIVE_ALGORITHMS, TEST_ALGORITHMS, HIGH_SPEED_ALGORITHMS
+
+    if which == 'live':
+        for key, algo in LIVE_ALGORITHMS.items():
+            print("{0}. {1}".format(key, algo))
+    elif which == 'test':
+        for key, algo in TEST_ALGORITHMS.items():
+            print("{0}. {1}".format(key, algo))
+    elif which == 'high_speed':
+        for key, algo in HIGH_SPEED_ALGORITHMS.items():
+            print("{0}. {1}".format(key, algo))
 
 
 if __name__ == '__main__':
