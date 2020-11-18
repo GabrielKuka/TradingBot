@@ -457,5 +457,5 @@ class BollingerBands(IAlgorithm):
             # Plot the graph
             self.plot_hist_graph(self.hist_df)
 
-        else:
-            print('Wrong bot mode.\nThis shouldn\'t happen')
+        # Delete csv file
+        file_manager.delete_file('{}.csv'.format(self.symbol), True)

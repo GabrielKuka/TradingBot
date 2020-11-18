@@ -15,11 +15,16 @@ from connection.websocket import WebSocket
 from helper.CSVReadWrite import CSVReadWrite
 
 
+def display_header():
+    print("\n~+~+~+~+~+~+~+~+~+~+~+~+~\n")
+    print("Relative Strength Index")
+    print("\n~+~+~+~+~+~+~+~+~+~+~+~+~")
+
+
 class RSI(IAlgorithm):
 
     def ws_open(self, ws):
         self.ws.on_open(ws)
-
 
         # Stream something
         self.ws.stream_trades(self.symbol)
@@ -90,6 +95,9 @@ class RSI(IAlgorithm):
         print('{}\tPrice: {}\tRSI: {}'.format(self.counter, close_price, str(rsi)))
 
     def __init__(self):
+
+        # Show header
+        display_header()
 
         # RSI Constants
         self.RSI_PERIOD = 14
@@ -315,4 +323,4 @@ class RSI(IAlgorithm):
         t_socket.join()
 
         # Delete csv file
-        file_manager.delete_file('SPY.csv'.format(self.symbol))
+        file_manager.delete_file('SPY.csv'.format(self.symbol), True)

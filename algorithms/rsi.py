@@ -15,6 +15,11 @@ from connection.websocket import WebSocket
 from helper.CSVReadWrite import CSVReadWrite
 
 
+def display_header():
+    print("\n~+~+~+~+~+~+~+~+~+~+~+~+~\n")
+    print("Relative Strength Index")
+    print("\n~+~+~+~+~+~+~+~+~+~+~+~+~")
+
 class RSI(IAlgorithm):
 
     def ws_open(self, ws):
@@ -90,6 +95,9 @@ class RSI(IAlgorithm):
         print('{}\tPrice: {}\tRSI: {}'.format(close_time, close_price, str(rsi)))
 
     def __init__(self, mode):
+
+        # Show header
+        display_header()
 
         # RSI Constants
         self.RSI_PERIOD = 14
@@ -444,5 +452,5 @@ class RSI(IAlgorithm):
             # Plot the graph
             self.plot_hist_graph(self.hist_df)
 
-        else:
-            print('Weird!')
+        # Delete csv file
+        file_manager.delete_file('{}.csv'.format(self.symbol), True)

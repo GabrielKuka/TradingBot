@@ -5,9 +5,19 @@ from connection.orders import *
 from connection.account import *
 
 
+def display_header():
+    print("\n~+~+~+~+~+~+~+~+~+~+~+~+~\n")
+    print("Long-Short Equity")
+    print("\n~+~+~+~+~+~+~+~+~+~+~+~+~")
+
+
 class LongShort:
 
     def __init__(self):
+
+        # Show header
+        display_header()
+
         self.alpaca = tradeapi.REST(config.api_key, config.api_secret,
                                     config.ACCOUNT_URL)
         self.__market = Market()

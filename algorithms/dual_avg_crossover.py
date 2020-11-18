@@ -24,7 +24,7 @@ from connection.orders import Orders
 
 def display_header():
     print("\n~+~+~+~+~+~+~+~+~+~+~+~+~\n")
-    print("Dual Simple Average Crossover Algorithm")
+    print("Dual Moving Average Crossover")
     print("\n~+~+~+~+~+~+~+~+~+~+~+~+~")
 
 
@@ -448,3 +448,5 @@ class DualAverageCrossover(IAlgorithm):
             # Plot graph
             self.plot_hist_graph(self.hist_df)
 
+        # Delete CSV File
+        file_manager.delete_file('{}.csv'.format(self.symbol), True)

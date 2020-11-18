@@ -3,8 +3,8 @@ from algorithms.rsi import *
 from algorithms.dual_avg_crossover import DualAverageCrossover
 from algorithms.mfi import MoneyFlowIndex
 from algorithms import mfi
-from algorithms.high_speed.rsi import RSI
-from algorithms.high_speed.bollinger import BollingerBands
+import algorithms.high_speed.rsi_speed as rsi_speed
+import algorithms.high_speed.bollinger_speed as bollinger_speed
 from algorithms.longshort import *
 from authentication import Auth
 
@@ -23,7 +23,8 @@ def handle_mode_command():
     while True:
 
         print("Enter bot mode: ")
-        print("0. Exit\n1. Testing\n2. Live Trading\n3. High Speed Trading\n4. Switch to Another Account\n5. Print Account Data\n")
+        print("0. Exit\n1. Testing\n2. Live Trading\n3. High Speed Trading\n4. Switch to Another Account\n5. Print "
+              "Account Data\n")
         mode = input("=> ")
 
         if mode.isdigit():
@@ -112,11 +113,11 @@ def handle_high_speed_mode():
                 break
             elif algo == 1:
                 # RSI
-                rsi = RSI()
+                rsi = rsi_speed.RSI()
                 rsi.execute()
             elif algo == 2:
                 # Bollinger
-                bb = BollingerBands()
+                bb = bollinger_speed.BollingerBands()
                 bb.execute()
             else:
                 print('Invalid input')

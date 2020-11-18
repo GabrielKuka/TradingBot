@@ -322,5 +322,5 @@ class BollingerBands(IAlgorithm):
         t_socket.join()
 
         # Delete file
-        file_manager.delete_file('SPY.csv'.format(self.symbol))
+        file_manager.delete_file('SPY.csv'.format(self.symbol), True)
 

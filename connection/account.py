@@ -70,7 +70,8 @@ class Account:
         positions = self.portfolio
 
         if len(positions) == 0:
-            portfolio = "You portfolio is empty."
+            portfolio = "You portfolio is empty." \
+                        "\n"
         else:
             portfolio = "\n~+~+~+~+~+~+~+~+~+~+~+~+~+~+~\n\n"
             portfolio += "Your portfolio: \n\n"

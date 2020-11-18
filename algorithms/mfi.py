@@ -42,7 +42,7 @@ def enter_data():
 
 def display_header():
     print("\n~+~+~+~+~+~+~+~+~+~+~+~+~\n")
-    print("Money Flow Index Algorithm")
+    print("Money Flow Index")
     print("\n~+~+~+~+~+~+~+~+~+~+~+~+~")
 
 
@@ -476,17 +476,17 @@ class MoneyFlowIndex(IAlgorithm):
             return
 
         if self.mode == 'active':
-            # # Cancel existing orders
-            # self.__orders.cancel_opened_orders()
-            #
-            # # Liquidate position if it exists
-            # self.liquidate_position()
-            #
-            # # Wait for market to open
-            # t = Thread(target=self.__market.await_market_open)
-            # t.start()
-            # t.join()
-            # print("[Market Opened]")
+            # Cancel existing orders
+            self.__orders.cancel_opened_orders()
+
+            # Liquidate position if it exists
+            self.liquidate_position()
+
+            # Wait for market to open
+            t = Thread(target=self.__market.await_market_open)
+            t.start()
+            t.join()
+            print("[Market Opened]")
 
             # Retrieve historical data about the asset
             self.retrieve_data()
@@ -522,4 +522,4 @@ class MoneyFlowIndex(IAlgorithm):
             self.plot_hist_graph(self.hist_df)
 
         # Delete the file
-        file_manager.delete_file('SPY.csv'.format(self.symbol))
+        file_manager.delete_file('{}.csv'.format(self.symbol), True)
