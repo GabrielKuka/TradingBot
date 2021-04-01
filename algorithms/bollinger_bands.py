@@ -220,7 +220,8 @@ class BollingerBands(IAlgorithm):
             else:
                 self.error = True
         else:
-            bars_dict = bars.get_historical_data(self.symbol, 100, 'day')
+            bars_dict = bars.get_historical_data(self.symbol, 500, 'day')
+
             if bars_dict:
                 csv_file.write_file(bars_dict, 't', 'c')
                 self.hist_df = pd.read_csv('temp_files/{}.csv'.format(self.symbol))

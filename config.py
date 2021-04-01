@@ -5,9 +5,6 @@ content = open('files/credentials.txt', 'r').read().splitlines()
 api_key = '' if not content else content[0]
 api_secret = '' if not content else content[1]
 
-# api_key="PK3NLNARB24PPO809FF9"
-# api_secret = "atx0JpIGRw6KZ3NP5rxkCudRE3kSU52D3HHfdzAJ"
-
 HEADERS = {
         'APCA-API-KEY-ID': api_key,
         'APCA-API-SECRET-KEY': api_secret
