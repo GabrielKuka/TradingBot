@@ -17,5 +17,5 @@
 ![image](https://user-images.githubusercontent.com/17888328/113290691-aef98700-92fa-11eb-95f9-b98820dac7de.png)
 
 ## High Speed Live Trading:
-![image](https://user-images.githubusercontent.com/17888328/113290691-aef98700-92fa-11eb-95f9-b98820dac7de.png)
+![image](https://user-images.githubusercontent.com/17888328/113291516-d0a73e00-92fb-11eb-8d7c-64697e6ab134.png)
 ![image](https://user-images.githubusercontent.com/17888328/113290939-f7b14000-92fa-11eb-8468-0a4283d98621.png)
